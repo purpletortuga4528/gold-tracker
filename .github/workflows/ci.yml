@@ -243,8 +243,8 @@ jobs:
         run: npm run check:freshness --prefix backend
         continue-on-error: true
 
-  ingest:
-    name: The ingest still works against the live IMF
+  upstream:
+    name: The two feeds still mean what the code assumes
     # Weekly and on demand, not on every push. The ingest is the one thing here
     # that depends on somebody else's API being up, and a red build on every
     # pull request because the IMF was restarting would teach people to ignore
@@ -286,6 +286,15 @@ jobs:
           name: rebuilt-snapshot
           path: backend/data/gold-reserves.json
           retention-days: 14
+
+      - name: The LBMA feed still means what the provider reads
+        # lbma.js takes the price by position from an unlabelled array. A
+        # reordered feed would not fail: it would report the euro price as
+        # dollars, and every figure on every page would look normal. Runs even
+        # if the ingest step above failed, because they are separate feeds and
+        # one being down says nothing about the other.
+        if: always()
+        run: npm run check:price-feed
 
   audit:
     name: Dependency advisories

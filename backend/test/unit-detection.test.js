@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { detectUnitScale, classifyValuation } from '../scripts/build-reserves.mjs';
+import { detectUnitScale, classifyValuation, buildEntry } from '../scripts/build-reserves.mjs';
 import { troyOuncesToTonnes, reserveValueUsd } from '../src/lib/units.js';
 
 const config = {
@@ -84,9 +84,11 @@ test('detection declines rather than guesses when inputs are missing', () => {
   assert.equal(detectUnitScale({ ...CASES.AGO, referencePrice: 0, config }), null);
 });
 
-test('an impossible figure that no power of ten explains is left for quarantine', () => {
-  // 300,000 t, with a dollar figure fitting no scale. Detection must not
-  // invent a correction; buildEntry quarantines it instead.
+test('detection declines an impossible figure it cannot explain', () => {
+  // 300,000 t, with a dollar figure fitting no scale. Detection must return
+  // null rather than invent a correction. What happens to the economy next is
+  // buildEntry's decision, and it is asserted further down: this test used to
+  // be named for the quarantine it does not perform.
   assert.equal(detect({ rawOunces: 9.6e9, reportedUsd: 7 }), null);
 });
 
@@ -134,4 +136,128 @@ test('the United States is not "corrected" by its own statutory book rate', () =
   // Gated on implausibility, so none of that ever runs.
   assert.equal(detect(CASES.USA, julyFix), null);
   assert.equal(troyOuncesToTonnes(CASES.USA.rawOunces).toFixed(1), '8133.5');
+});
+
+/*
+ * buildEntry: the decision to publish, quarantine, or skip.
+ *
+ * detectUnitScale decides whether a divisor is justified. buildEntry decides
+ * what happens to the economy afterwards, and that is the branch that keeps an
+ * impossible figure off the page. The test above named for quarantine only
+ * asserted that detection declined to invent a correction, which is a different
+ * function answering a different question; nothing exercised the exclusion
+ * itself, and `meta.quarantined` is empty on every real run, so live data never
+ * has either.
+ */
+
+const asMap = (pairs) => new Map(pairs);
+/** A flat price, so a case is about the tonnage rather than about the month. */
+const flatPrice = () => REFERENCE;
+
+const entryFor = (overrides = {}) =>
+  buildEntry({
+    code: 'ZZZ',
+    name: 'Testland',
+    kind: 'country',
+    region: 'Europe',
+    goldOz: asMap([['2026-M06', 3_360_000], ['2026-M07', 3_360_000]]),
+    goldUsd: asMap([['2026-M06', 14_792_000_000], ['2026-M07', 14_792_000_000]]),
+    totalUsd: asMap([['2026-M06', 60_000_000_000], ['2026-M07', 60_000_000_000]]),
+    priceOn: flatPrice,
+    config,
+    manualOverrides: new Map(),
+    ...overrides,
+  });
+
+test('a believable economy is published, with its share denominator', () => {
+  const { entry, quarantined, skipped } = entryFor();
+  assert.equal(quarantined, undefined);
+  assert.equal(skipped, undefined);
+  assert.equal(entry.countryCode, 'ZZZ');
+  assert.equal(entry.reserveTonnes, 104.51);
+  assert.equal(entry.history.length, 2);
+  // Non-gold reserves, not the IMF's total: the app restates gold at market.
+  assert.equal(entry.nonGoldReservesUsd, 60_000_000_000 - 14_792_000_000);
+});
+
+test('an impossible figure no power of ten explains is quarantined, not published', () => {
+  // 300,000 t as filed, with a dollar figure matching no scale, so detection
+  // returns null for every period and the divisor stays 1.
+  const impossible = entryFor({
+    goldOz: asMap([['2026-M07', 9.6e9]]),
+    goldUsd: asMap([['2026-M07', 7]]),
+    totalUsd: asMap([['2026-M07', 1000]]),
+  });
+
+  assert.equal(impossible.entry, undefined, 'it must not reach the published file');
+  assert.ok(impossible.quarantined, 'it must be recorded rather than silently dropped');
+  assert.equal(impossible.quarantined.countryCode, 'ZZZ');
+  assert.ok(
+    impossible.quarantined.peakImpliedTonnes > config.maxPlausibleTonnes,
+    'the record should carry the figure that failed',
+  );
+  assert.match(impossible.quarantined.reason, /plausibility ceiling/);
+});
+
+test('the ceiling is judged on the whole history, not just the latest filing', () => {
+  // Plausible today, impossible in an earlier month. Publishing the entry would
+  // put 300,000 t on the country's own history chart.
+  const spike = entryFor({
+    goldOz: asMap([['2026-M06', 9.6e9], ['2026-M07', 3_360_000]]),
+    goldUsd: asMap([['2026-M06', 7], ['2026-M07', 14_792_000_000]]),
+    totalUsd: asMap([['2026-M07', 60_000_000_000]]),
+  });
+
+  assert.ok(spike.quarantined, 'a spike anywhere in the series disqualifies the entry');
+  assert.equal(spike.quarantined.peakImpliedTonnes > 100_000, true);
+});
+
+test('an aggregate is exempt from the ceiling, because it is not one country', () => {
+  // The Euro Area is 21 central banks plus the ECB and stands at 10,807 t. The
+  // ceiling is a statement about a single country, so applying it here would
+  // quarantine a real and correct figure.
+  const euroAreaOunces = 347_500_000; // about 10,807 t
+  const aggregate = entryFor({
+    kind: 'aggregate',
+    goldOz: asMap([['2026-M07', euroAreaOunces]]),
+    goldUsd: asMap([['2026-M07', euroAreaOunces * REFERENCE]]),
+    totalUsd: asMap([['2026-M07', euroAreaOunces * REFERENCE * 2]]),
+  });
+
+  assert.equal(aggregate.quarantined, undefined, 'an aggregate may exceed a country ceiling');
+  assert.ok(aggregate.entry.reserveTonnes > config.maxPlausibleTonnes);
+
+  // And the same figure filed as a country is quarantined, so the exemption is
+  // doing the work rather than the ceiling having been raised.
+  const asCountry = entryFor({
+    kind: 'country',
+    goldOz: asMap([['2026-M07', euroAreaOunces]]),
+    goldUsd: asMap([['2026-M07', euroAreaOunces * REFERENCE]]),
+    totalUsd: asMap([['2026-M07', euroAreaOunces * REFERENCE * 2]]),
+  });
+  assert.ok(asCountry.quarantined, 'the same tonnage as a country must not be published');
+});
+
+test('a filing in the wrong unit is corrected and published, not quarantined', () => {
+  // The Brazil case: ounces reported a thousandfold, with the reporter's own
+  // dollar figure identifying the scale.
+  const corrected = entryFor({
+    goldOz: asMap([['2026-M07', 3_360_000 * 1000]]),
+    goldUsd: asMap([['2026-M07', 14_792_000_000]]),
+    totalUsd: asMap([['2026-M07', 60_000_000_000]]),
+  });
+
+  assert.equal(corrected.quarantined, undefined);
+  assert.equal(corrected.entry.reserveTonnes, 104.51, 'the divisor should restore the real tonnage');
+  assert.equal(corrected.entry.unitScaleApplied.divisor, 1000);
+});
+
+test('an economy with no usable observation is skipped rather than published empty', () => {
+  const empty = entryFor({
+    goldOz: asMap([['not-a-period', 3_360_000]]),
+    goldUsd: asMap([]),
+    totalUsd: asMap([]),
+  });
+  assert.equal(empty.skipped, 'no usable observations');
+  assert.equal(empty.entry, undefined);
 });

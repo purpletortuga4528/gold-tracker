@@ -346,7 +346,18 @@ function describeScale({ code, periods, divisorFor, detections, manual, round })
   };
 }
 
-function buildEntry({ code, name, kind, region, goldOz, goldUsd, totalUsd, priceOn, config, manualOverrides }) {
+/**
+ * Turns one economy's raw series into a published entry, a quarantine record,
+ * or nothing.
+ *
+ * Exported for the tests. The quarantine branch below is the last thing between
+ * an impossible figure and a page presenting it as fact, and it had no coverage
+ * at all: the test named for it asserted only that detectUnitScale declined to
+ * invent a correction, which is a different function making a different
+ * decision. `meta.quarantined` is empty on every real run, so live data has
+ * never exercised it either.
+ */
+export function buildEntry({ code, name, kind, region, goldOz, goldUsd, totalUsd, priceOn, config, manualOverrides }) {
   const periods = [...goldOz.keys()].sort();
   const latestPeriod = periods.at(-1);
   const rawLatest = goldOz.get(latestPeriod);

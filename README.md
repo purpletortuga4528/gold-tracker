@@ -37,7 +37,7 @@ installing only the backend on 20.6 and serving real data from it. Developed on
 Node 24.
 
 ```bash
-npm test              # both suites: 77 backend, 151 frontend
+npm test              # both suites: 96 backend, 151 frontend
 npm run test:backend
 npm run test:frontend
 npm run test:coverage
@@ -46,6 +46,7 @@ npm run build         # production frontend build
 npm run build:data    # refresh the reserves snapshot from the IMF
 npm run check:docs    # do the figures quoted in these docs still match reality?
 npm run check:ingest  # did a rebuild break the dataset? (see the script for its two arguments)
+npm run check:price-feed  # does the LBMA feed still mean what the provider reads?
 npm run check:freshness --prefix backend   # is the snapshot stale? exits 0/1/2
 ```
 
@@ -56,13 +57,16 @@ the IMF snapshot ages, and an advisory can be published against a dependency
 nobody has touched. Coverage runs as part of the docs check, which compares it
 against the figure quoted below.
 
-`build:data` runs weekly only, and on demand. It is the one thing here that
-depends on somebody else's API being up, and a red build on every pull request
-because the IMF was restarting would teach people to ignore red builds. A week
-sits well inside IRFCL's monthly publication cycle. The rebuilt snapshot is
-compared against the committed one by `check:ingest`, which fails on shapes
-meaning the pipeline broke, and merely reports figures that moved: a central
-bank buying gold is the data working, not a reason for a red build.
+One job runs weekly only, and on demand: the one that talks to the two upstream
+feeds. A red build on every pull request because the IMF was restarting would
+teach people to ignore red builds, and a week sits well inside IRFCL's monthly
+publication cycle.
+
+It does two things. `build:data` rebuilds from the IMF and `check:ingest`
+compares the result against the committed snapshot, failing on shapes that mean
+the pipeline broke and merely reporting figures that moved, because a central
+bank buying gold is the data working. And `check:price-feed` confirms the LBMA
+feed still has the shape `lbma.js` reads, which matters more than it sounds.
 
 ## Hosting it
 
@@ -229,6 +233,8 @@ gold-tracker/
   scripts/
     dev.mjs              runs both servers with one Ctrl+C
     check-docs.mjs       verifies figures quoted in the docs against reality
+    check-ingest.mjs     compares a fresh dataset against the committed one
+    check-price-feed.mjs the LBMA feed still means what the provider reads
   .github/workflows/ci.yml
 ```
 
@@ -311,7 +317,7 @@ straight out of `index.css` and composited in Node, so
 ground it can land on, including the tinted chips, in all four modes. No
 browser, no CSS engine, and it runs in CI with the rest of the suite.
 
-**The tests cover behaviour, not lines.** 228 of them: 77 backend, 151 frontend.
+**The tests cover behaviour, not lines.** 247 of them: 96 backend, 151 frontend.
 The frontend suite covers 86 percent of statements with `coverage.all` enabled,
 so untested files count as zero rather than being left out of the report. What
 is deliberately not covered is `App.jsx`, `Dashboard.jsx` and `PriceChart.jsx`:
@@ -440,6 +446,33 @@ catch a fraction of what matters, and nothing here substitutes for someone using
 a screen reader in earnest. What it does is stop the fraction it covers from
 regressing quietly, which is why everything else in this file is checked rather
 than remembered.
+
+**Both feeds are read by position, so both are checked.** The ingest maps SDMX
+attributes by name and is comparatively safe. The price provider is not:
+
+```js
+const CURRENCY_INDEX = { USD: 0, GBP: 1, EUR: 2 };
+```
+
+A row is `{"is_cms_locked":0,"d":"2026-09-08","v":[4399.1,3246.1,3784.55]}`.
+There are no labels, and that undocumented `is_cms_locked` is a fair hint that
+the shape is nobody's contract.
+
+The failure worth guarding is not the feed vanishing. That throws, the route
+answers 502, and the app says so on the page. It is the feed being reordered:
+gold would be reported at the euro price, every country's valuation would come
+out about fourteen percent light, and every figure on every page would look
+completely ordinary. `check:price-feed` checks the things that would give that
+away, weekly: three values and not four, a date in the format expected, a price
+in a plausible band, the dollar column still the largest of the three, no jump
+between two fixes that the market did not make, and the provider's own reading
+matching the row it just read.
+
+Its plausibility floor is 400 rather than 100, and a test is the reason. A
+per-gram figure read as per-ounce is the true price divided by 31.1, so gold at
+$4,399 arrives as $141, and a floor of 100 waved it straight through. That is
+the exact mistake the provider README warns about hardest, and this checker
+missed it until something checked the checker.
 
 **Charts step, they do not curve.** Reserve figures are month-end reports. A
 smooth line would imply a central bank's holding drifts continuously between

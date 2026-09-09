@@ -88,7 +88,12 @@ export function createApp() {
     // deliberate 503 telling you to run `npm run build:data`, and the 502
     // saying the price provider was unreachable, replacing both with a blank
     // "Internal server error" that gives the operator nothing to act on.
-    const safe = err instanceof HttpError || err?.expose === true;
+    //
+    // `err.expose` is deliberately NOT honoured. It looks like the same idea,
+    // but it is http-errors' convention for "status is below 500", which any
+    // dependency can set on a message this code has never seen. The rule here
+    // is authorship, and only HttpError carries that.
+    const safe = err instanceof HttpError;
 
     if (status >= 500) console.error('[api] error:', err);
     res.status(status).json({

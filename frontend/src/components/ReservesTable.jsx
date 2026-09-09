@@ -49,14 +49,14 @@ export function ReservesTable({ countries, selectable, selected, onToggle }) {
     setSort((s) => ({ key, dir: s.key === key && s.dir === 'desc' ? 'asc' : 'desc' }));
 
   if (countries.length === 0) {
-    return <p className="py-8 text-sm text-ink/50">No countries match that filter.</p>;
+    return <p className="py-8 text-sm text-ink-muted">No countries match that filter.</p>;
   }
 
   return (
     <div className="table-scroll">
       <table className="w-full min-w-[58rem] border-collapse text-sm">
         <thead>
-          <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-ink/50">
+          <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-ink-muted">
             {selectable && <th className="w-8 px-2 py-2" />}
             {COLUMNS.map((col) => (
               <th
@@ -98,7 +98,7 @@ export function ReservesTable({ countries, selectable, selected, onToggle }) {
                   />
                 </td>
               )}
-              <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-ink/40">{c.rank}</td>
+              <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-ink-subtle">{c.rank}</td>
               <td className="whitespace-nowrap px-3 py-2">
                 <Link
                   to={`/countries/${c.countryCode}`}
@@ -120,11 +120,11 @@ export function ReservesTable({ countries, selectable, selected, onToggle }) {
                   </span>
                 )}
               </td>
-              <td className="whitespace-nowrap px-3 py-2 text-ink/60">{c.region ?? '--'}</td>
+              <td className="whitespace-nowrap px-3 py-2 text-ink-muted">{c.region ?? '--'}</td>
               <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">{formatTonnes(c.reserveTonnes)}</td>
               <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
                 {c.valueUsd == null ? (
-                  <span className="text-ink/30">price unavailable</span>
+                  <span className="text-ink-subtle">price unavailable</span>
                 ) : (
                   formatUsdCompact(c.valueUsd)
                 )}
@@ -132,7 +132,7 @@ export function ReservesTable({ countries, selectable, selected, onToggle }) {
               <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
                 {c.shareOfReserves == null ? (
                   <span
-                    className="text-ink/30"
+                    className="text-ink-subtle"
                     title="This economy does not report total reserve assets alongside its gold, so the share cannot be computed."
                   >
                     n/a
@@ -141,7 +141,7 @@ export function ReservesTable({ countries, selectable, selected, onToggle }) {
                   formatPercent(c.shareOfReserves)
                 )}
               </td>
-              <td className="whitespace-nowrap px-3 py-2 text-ink/50">{formatDate(c.asOfDate)}</td>
+              <td className="whitespace-nowrap px-3 py-2 text-ink-muted">{formatDate(c.asOfDate)}</td>
             </tr>
           ))}
         </tbody>

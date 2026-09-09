@@ -22,7 +22,7 @@ function SegmentedControl({ legend, options, value, onChange, renderOption }) {
             className={`rounded-md px-2 py-1 text-xs font-medium transition ${
               active
                 ? 'bg-accent text-on-accent'
-                : 'text-ink/60 hover:bg-ink/5 hover:text-ink'
+                : 'text-ink-muted hover:bg-ink/5 hover:text-ink'
             }`}
           >
             {renderOption(opt)}

@@ -14,10 +14,11 @@ async function serve() {
 }
 
 test('a burst the size of a real page load is not throttled', async () => {
-  // The constraint that shapes every limit here. One Compare page load with six
-  // countries fires 20 requests in about 0.03 seconds, and React StrictMode
-  // doubles that again in development. A limit that rejects the app's own
-  // normal behaviour is worse than no limit.
+  // The constraint that shapes every limit here. A cold Compare load with six
+  // countries fires exactly the 10 requests below, inside a millisecond, and
+  // React StrictMode doubles them to 20 in development. That doubled burst is
+  // what this replays. A limit that rejects the app's own normal behaviour is
+  // worse than no limit.
   const s = await serve();
   try {
     const paths = [
@@ -266,5 +267,57 @@ test('a path merely starting with /api/health does not escape rate limiting', as
     assert.match(health.headers.get('ratelimit') ?? '', /1200/);
   } finally {
     await s.stop();
+  }
+});
+
+test('a non-positive limit falls back to the default rather than taking the API offline', async () => {
+  // express-rate-limit v7 and later answer every request with 429 when the
+  // limit is 0, so a typo in an env var is a self-inflicted outage, not a
+  // disabled limiter. Verified against the library below rather than assumed.
+  const cases = [
+    ['0', 600],
+    ['-1', 600],
+    // parseInt would read these as 1 and 600, quietly configuring a limit
+    // nobody typed. The config uses Number so they are rejected instead.
+    ['1.5', 600],
+    ['600abc', 600],
+    ['abc', 600],
+    ['', 600],
+    ['250', 250],
+  ];
+
+  for (const [raw, expected] of cases) {
+    const before = process.env.RATE_LIMIT_GENERAL;
+    process.env.RATE_LIMIT_GENERAL = raw;
+    // Silence the warning the fallback prints; the point here is the value.
+    const warn = console.warn;
+    console.warn = () => {};
+    const { config: fresh } = await import(`../src/config.js?limit=${encodeURIComponent(raw)}`);
+    console.warn = warn;
+    if (before === undefined) delete process.env.RATE_LIMIT_GENERAL;
+    else process.env.RATE_LIMIT_GENERAL = before;
+
+    assert.equal(fresh.rateLimit.general, expected, `RATE_LIMIT_GENERAL=${JSON.stringify(raw)}`);
+  }
+});
+
+test('a limit of zero really does block everything, which is why the guard exists', async () => {
+  // The premise of the test above. If a future version of express-rate-limit
+  // changes this to mean "unlimited", the guard is still right but the reason
+  // in the comment is not, and this is what would say so.
+  const express = (await import('express')).default;
+  const { rateLimit } = await import('express-rate-limit');
+
+  const app = express();
+  app.use(rateLimit({ windowMs: 60_000, limit: 0, standardHeaders: 'draft-8', legacyHeaders: false, validate: false }));
+  app.get('/', (_req, res) => res.json({ ok: true }));
+
+  const server = app.listen(0);
+  await new Promise((r) => server.once('listening', r));
+  try {
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/`);
+    assert.equal(res.status, 429, 'limit: 0 should reject, not pass through');
+  } finally {
+    await new Promise((r) => server.close(r));
   }
 });

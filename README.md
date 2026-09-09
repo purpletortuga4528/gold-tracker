@@ -37,7 +37,7 @@ installing only the backend on 20.6 and serving real data from it. Developed on
 Node 24.
 
 ```bash
-npm test            # both suites: 50 backend, 117 frontend
+npm test            # both suites: 73 backend, 146 frontend
 npm run test:backend
 npm run test:frontend
 npm run test:coverage
@@ -47,10 +47,14 @@ npm run check:freshness --prefix backend   # is the snapshot stale? exits 0/1/2
 npm run check:docs  # do the figures quoted in these docs still match reality?
 ```
 
-Every one of those runs in CI on push and pull request, plus weekly, because
-two of them go stale on their own rather than when someone changes the code:
-the IMF snapshot ages, and an advisory can be published against a dependency
-nobody has touched.
+CI runs the tests, the build, the docs check, the freshness check and
+`npm audit` on every push and pull request, and again weekly, because two of
+those go stale on their own rather than when someone changes the code: the IMF
+snapshot ages, and an advisory can be published against a dependency nobody has
+touched. Coverage runs as part of the docs check, which compares it against the
+figure quoted below. `build:data` is the one command CI does not run, because it
+calls the IMF on every invocation; the freshness check is what watches the
+snapshot instead.
 
 ## Hosting it
 
@@ -65,9 +69,10 @@ docker compose up -d
 The image is two stages, so no build tooling reaches the running container. It
 runs as a non-root user, writes only the directory holding the snapshot, and
 its healthcheck reports unhealthy when the data goes stale as well as when the
-process is down, because a container serving three month old figures is not
-healthy in any sense that matters. A named volume keeps the refreshed snapshot
-across rebuilds.
+process is down: a container that is up and serving a snapshot nobody has
+rebuilt in seventy days is not healthy in any sense that matters, and a check
+that only pings the port would call it fine. A named volume keeps the refreshed
+snapshot across rebuilds.
 
 **systemd**, if you would rather not use Docker. A unit is in
 [deploy/gold-tracker.service](deploy/gold-tracker.service), with the hardening
@@ -174,17 +179,22 @@ Keys stay server side. The frontend never calls a provider and never sees a key.
 gold-tracker/
   backend/
     src/
+      index.js           listens, prints the limits, handles SIGTERM
+      app.js             middleware order, health, the error handler
+      config.js          every environment variable, parsed and guarded
       routes/            price and reserves HTTP routes
       services/
         priceProviders/  lbma.js, plus README.md on adding a second
         price.js         provider selection, caching, stale fallback
         reserves.js      dataset loading, search and filtering
+        freshness.js     how stale the snapshot is, on two clocks
+        refresh.js       rebuilds the snapshot on a schedule
       lib/
         units.js         troy ounce conversions, the one place they live
         cache.js         TTL cache with in-flight de-duplication
         http.js          query validation, HttpError, security headers
         rateLimit.js     the three buckets, and the proxy warning
-      services/freshness.js  how stale the snapshot is, on two clocks
+        serveFrontend.js the built app, its own CSP, the SPA fallback
     scripts/
       build-reserves.mjs  regenerates the dataset, with unit detection
       verify-provider.mjs one real call against a provider, printed raw
@@ -196,6 +206,7 @@ gold-tracker/
       pages/             Dashboard, Countries, CountryDetail, Compare
       components/        table, charts, price headline, provenance panel
       lib/               API client, formatting, price context, appearance
+      index.css          the whole palette, and the high contrast layer
   scripts/
     dev.mjs              runs both servers with one Ctrl+C
     check-docs.mjs       verifies figures quoted in the docs against reality
@@ -220,8 +231,8 @@ upstream call, not ten. If a refresh fails and a stale value exists, the API
 serves the stale value flagged as stale rather than blanking the dashboard.
 
 **Gold's share of reserves is computed, never read off.** Reporters value gold
-inconsistently, so the IMF's own ratio puts US gold at 4 percent of US reserves
-against a published figure near 84 percent. What the dataset stores is non-gold
+inconsistently, so the IMF's own ratio puts US gold at about 4 percent of US
+reserves against a published figure near 84 percent. What the dataset stores is non-gold
 reserves, the one quantity stable across valuation methods; the share is
 restated at the live gold price and moves with it. It tracks published shares
 closely but does not reproduce them exactly, and
@@ -265,36 +276,68 @@ contrast and preferring a dark ground are different needs, so `data-contrast`
 layers on top of `data-theme` and high-contrast dark is reachable. Grounds go
 pure, borders become ink, chart gradients are dropped for thicker strokes.
 
-The palette alone would not have been enough. Secondary text throughout is ink
-at reduced opacity (`text-ink/50`), which compiles to a `color-mix` against
-transparent, and pure black at 50 percent on white is `#808080`, about 3.9:1.
-Explicit rules in `index.css` restore full opacity to those utilities under high
-contrast. Add a new opacity step in a component and it needs adding there too.
+The palette alone was not enough, and the way it was patched turned out to be
+the bug. Secondary text used to be ink at reduced opacity (`text-ink/50` and
+friends), which Tailwind compiles to a `color-mix` against transparent. Pure
+black at 50 percent on white is `#808080`, about 3.9:1, and the fade happens
+after the palette, so no palette can rescue it. High contrast worked around
+that by restoring full opacity on a hand-listed set of generated class names,
+which left the two normal-contrast modes failing and meant any new opacity step
+quietly reopened the hole.
 
-**The tests cover behaviour, not lines.** 167 of them: 50 backend, 117 frontend.
+Secondary text is now two solid tokens, `--c-ink-muted` and `--c-ink-subtle`,
+defined per theme. That is what makes it checkable: solid colours can be read
+straight out of `index.css` and composited in Node, so
+`frontend/src/lib/palette.test.js` asserts every text token against every
+ground it can land on, including the tinted chips, in all four modes. No
+browser, no CSS engine, and it runs in CI with the rest of the suite.
+
+**The tests cover behaviour, not lines.** 219 of them: 73 backend, 146 frontend.
 The frontend suite covers 86 percent of statements with `coverage.all` enabled,
 so untested files count as zero rather than being left out of the report. What
 is deliberately not covered is `App.jsx`, `Dashboard.jsx` and `PriceChart.jsx`:
 routing, composition, and a Recharts component whose drawing jsdom cannot
 meaningfully verify. A chart that passes in jsdom is not evidence it renders.
 
-**Contrast is measured, not eyeballed.** The check walks every rendered text
-element and computes the real ratio against its resolved background. Sampled on
-`/countries`, the densest page, which renders every row; the element count is
-lower on other pages:
+**Contrast is measured, not eyeballed.** Two checks, because neither is
+sufficient alone. `palette.test.js` pins the palette in CI. On top of that, a
+browser pass walks every rendered text element and computes the real ratio
+against its resolved background, which is the only way to catch a colour a
+component invented for itself. Sampled on `/countries`, the densest page, which
+renders every row; the element count is lower on other pages:
 
 | Mode | Bar | Worst measured | Failing |
 |---|---|---|---|
-| light / normal | AA 4.5 | 5.37 | 0 of 622 |
-| light / high | AAA 7.0 | 11.52 | 0 of 622 |
-| dark / normal | AA 4.5 | 6.45 | 0 of 622 |
-| dark / high | AAA 7.0 | 15.37 | 0 of 622 |
+| light / normal | AA 4.5 | 5.37 | 0 of 638 |
+| light / high | AAA 7.0 | 11.52 | 0 of 638 |
+| dark / normal | AA 4.5 | 6.45 | 0 of 638 |
+| dark / high | AAA 7.0 | 15.37 | 0 of 638 |
 
-Two real defects came out of running it. The light accent was darkened from
-`#a37814` to `#8a6412`, because white button labels on the original measured
-4.00:1. And the "unit fix" pill rendered black on black in light high contrast,
-a ratio of exactly 1.00, because its background token becomes ink there; it is
-now an outlined chip. Neither was visible by eye against the surrounding design.
+Measured 2026-09-09. An element counts if it has a direct non-empty text node,
+is visible, and has a non-zero box.
+
+Three real defects came out of running it, and the third is the one worth
+repeating. The light accent was darkened from `#a37814` to `#8a6412`, because
+white button labels on the original measured 4.00:1. The "unit fix" pill
+rendered black on black in light high contrast, a ratio of exactly 1.00,
+because its background token becomes ink there; it is now an outlined chip.
+
+The third was the audit itself. Its colour parser matched `rgb()` and `rgba()`,
+and Chrome reports Tailwind's `color-mix` opacity utilities as `oklab(...)`, so
+every faded element was skipped without a word. That is precisely the set of
+elements at risk. Every row of the table above used to read "0 of 622"; in fact
+187 of 638 elements sat below AA in light normal and 86 in dark normal, the rank
+column at 2.52:1. The two high-contrast rows happened to be right, because high
+contrast restored those elements to full opacity and left nothing for the parser
+to miss, which is what made the gap look like a passing result rather than a
+blind spot. The check reported the worst element it could parse and called it
+the worst element. A measurement that silently drops its hardest cases is worse
+than none, because it gets quoted.
+
+Two habits came out of that. Parse `oklab()` and `color-mix()`, or count what
+you skipped and fail if it is not zero. And prefer a check that cannot have a
+blind spot: the palette test reads solid hex values, so there is nothing for a
+parser to miss.
 
 Measure on a real page load, not by flipping `data-theme` in the console and
 reading `getComputedStyle` straight after. Doing the latter returns styles the
@@ -306,8 +349,9 @@ font CDN, so the app works offline and no request about the reader leaves the
 machine. Google Fonts credits it to the Braille Institute, Applied Design Works,
 Elliott Scott, Megan Eiswerth and Letters From Sweden; it is the 2024 second
 version of Atkinson Hyperlegible, whose letterforms are drawn so that easily
-confused characters stay distinct. Table cells are `whitespace-nowrap`: the face is wider than the system
-stack, and without it rows wrap instead of the table scrolling.
+confused characters stay distinct. Table cells are `whitespace-nowrap`: the
+face is wider than the system stack, and without it rows wrap instead of the
+table scrolling.
 
 **Self-hosting is one process, and the two policies differ.** In production the
 API serves the built app from `frontend/dist`, mounted after the API routes so
@@ -345,9 +389,13 @@ The API is small but it is still an HTTP surface, so a few things are deliberate
 - **Error messages are opt-in, not opt-out.** Only an `HttpError` thrown
   deliberately is returned to the client; anything else is logged and replaced.
   Unexpected errors carry absolute paths and upstream URLs, and the dataset
-  loader's ENOENT was returning a full filesystem path.
-- **Security headers** (`nosniff`, `DENY`, `no-referrer`, a `default-src 'none'`
-  CSP) are set on every response, and the framework banner is disabled.
+  loader's ENOENT was returning a full filesystem path. `err.expose` is not
+  honoured either, tempting as it looks: it means "status under 500" to
+  `http-errors`, and any dependency can set it on a message nothing here wrote.
+- **Security headers** (`nosniff`, `DENY`, `no-referrer`, a CSP) are set on
+  every response, and the framework banner is disabled. The CSP differs by
+  surface, as above: `default-src 'none'` for the API, the app's own policy for
+  the app.
 - **Provider keys stay server-side.** The frontend never calls a provider and
   never receives a key. Nothing is echoed back in an error.
 - **CORS is an allowlist**, defaulting to the dev origin only.
@@ -372,15 +420,20 @@ Three buckets, because the endpoints do not cost the same thing:
 
 | Bucket | Limit | Why |
 |---|---|---|
-| general (`/api/*`) | 600/min | Browsing five pages uses about 55 |
-| `/api/price/history` | 45/min | `?range=max` returns **694 kB** from a 60 byte request. This is what actually caps egress |
+| general (`/api/*`) | 600/min | Browsing five pages uses 15 |
+| `/api/price/history` | 45/min | `?range=max` returns **694 kB** for a 67 byte request. This is what actually caps egress |
 | `/api/health` | 1200/min | A monitor polls it; throttling it would fake an outage |
 
-Limits are sized against measured behaviour, not guessed. One Compare page load
-with six countries fires **20 requests in 0.03 seconds**, and React StrictMode
-doubles that in development, so a short window or a limit in the low tens would
-reject the app's own normal traffic. A test replays that exact burst and asserts
-none of it is rejected.
+Limits are sized against measured behaviour, not guessed. A cold Compare load
+with six countries fires **10 requests inside a millisecond**: the price, the
+freshness check, the dataset metadata, the country list, and one per economy.
+React StrictMode doubles that to 20 in development. So a short window, or a
+limit in the low tens, would reject the app's own normal traffic. A test
+replays that doubled burst and asserts none of it is rejected.
+
+Browsing five pages, one of them that Compare, is 15 requests in total. The
+600 limit is two orders of magnitude above what the app asks for, which is the
+point: it is there to stop a loop, not to ration a reader.
 
 The buckets are separate on purpose: exhausting the history limit leaves the
 price headline and the reserves table working, and only the chart card errors.

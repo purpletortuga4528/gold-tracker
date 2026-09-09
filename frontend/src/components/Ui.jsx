@@ -7,7 +7,7 @@ export function Card({ title, subtitle, right, children, className = '' }) {
         <header className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
           <div>
             {title && <h2 className="text-lg font-semibold tracking-tight">{title}</h2>}
-            {subtitle && <p className="mt-0.5 text-sm text-ink/60">{subtitle}</p>}
+            {subtitle && <p className="mt-0.5 text-sm text-ink-muted">{subtitle}</p>}
           </div>
           {right}
         </header>
@@ -19,7 +19,7 @@ export function Card({ title, subtitle, right, children, className = '' }) {
 
 export function Spinner({ label = 'Loading' }) {
   return (
-    <div className="flex items-center gap-2 py-8 text-sm text-ink/50" role="status">
+    <div className="flex items-center gap-2 py-8 text-sm text-ink-muted" role="status">
       <span className="h-3 w-3 animate-pulse rounded-full bg-accent" aria-hidden="true" />
       {label}
     </div>
@@ -39,7 +39,7 @@ export function ErrorNote({ error, hint }) {
 
 export function Pill({ children, tone = 'neutral' }) {
   const tones = {
-    neutral: 'bg-ink/5 text-ink/70',
+    neutral: 'bg-ink/5 text-ink-muted',
     gold: 'bg-accent-soft text-accent-strong',
     warn: 'bg-warn-line text-warn-ink',
   };
@@ -51,7 +51,7 @@ export function Pill({ children, tone = 'neutral' }) {
 }
 
 export function Delta({ fraction }) {
-  if (!Number.isFinite(fraction)) return <span className="text-ink/40">--</span>;
+  if (!Number.isFinite(fraction)) return <span className="text-ink-subtle">--</span>;
   const up = fraction >= 0;
   return (
     <span className={up ? 'text-positive' : 'text-negative'}>

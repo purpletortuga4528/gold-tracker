@@ -55,17 +55,25 @@ export async function getPriceHistory({ from, to, range } = {}) {
   return { ...value, points, from: resolvedFrom ?? null, to: to ?? null, range: range ?? null };
 }
 
-const RANGE_MONTHS = { '1m': 1, '3m': 3, '6m': 6, '1y': 12, '2y': 24, '5y': 60, '10y': 120 };
+// A Map, not an object literal, because `range` arrives from a query string.
+// The route rejects anything outside SUPPORTED_RANGES before this is reached,
+// so the object form was not exploitable over HTTP, but it was one refactor
+// away from being so: `RANGE_MONTHS['constructor']` returns a function, which
+// is truthy, and the arithmetic below then yields an Invalid Date whose
+// toISOString throws. A Map has no inherited keys and cannot do that.
+const RANGE_MONTHS = new Map([
+  ['1m', 1], ['3m', 3], ['6m', 6], ['1y', 12], ['2y', 24], ['5y', 60], ['10y', 120],
+]);
 
 export function rangeToStartDate(range, now = new Date()) {
   if (!range || range === 'max') return null;
-  const months = RANGE_MONTHS[range];
+  const months = RANGE_MONTHS.get(range);
   if (!months) return null;
   const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - months, now.getUTCDate()));
   return d.toISOString().slice(0, 10);
 }
 
-export const SUPPORTED_RANGES = [...Object.keys(RANGE_MONTHS), 'max'];
+export const SUPPORTED_RANGES = [...RANGE_MONTHS.keys(), 'max'];
 
 export function clearPriceCache() {
   cache.clear();

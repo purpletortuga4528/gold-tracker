@@ -52,7 +52,7 @@ export function Countries() {
       >
         <div className="mb-4 flex flex-wrap items-end gap-3">
           <label className="flex-1 min-w-[14rem]">
-            <span className="mb-1 block text-xs uppercase tracking-wide text-ink/50">
+            <span className="mb-1 block text-xs uppercase tracking-wide text-ink-muted">
               Search by name, code or region
             </span>
             <input
@@ -65,7 +65,7 @@ export function Countries() {
           </label>
 
           <label>
-            <span className="mb-1 block text-xs uppercase tracking-wide text-ink/50">Region</span>
+            <span className="mb-1 block text-xs uppercase tracking-wide text-ink-muted">Region</span>
             <select
               value={region}
               onChange={(e) => setRegion(e.target.value)}
@@ -80,7 +80,7 @@ export function Countries() {
             </select>
           </label>
 
-          <label className="flex items-center gap-2 pb-2 text-sm text-ink/70">
+          <label className="flex items-center gap-2 pb-2 text-sm text-ink-muted">
             <input
               type="checkbox"
               className="h-4 w-4 accent-[var(--c-accent)]"
@@ -92,7 +92,7 @@ export function Countries() {
         </div>
 
         {selected.length === 1 && (
-          <p className="mb-3 text-sm text-ink/50">Select one more to compare.</p>
+          <p className="mb-3 text-sm text-ink-muted">Select one more to compare.</p>
         )}
 
         {list.loading && <Spinner label="Loading countries" />}

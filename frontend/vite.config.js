@@ -20,6 +20,16 @@ export default defineConfig({
       all: true,
       include: ['src/**/*.{js,jsx}'],
       exclude: ['src/main.jsx', 'src/test/**', 'src/**/*.test.{js,jsx}'],
+      // A floor, not a target. It sits a little under the current figures so
+      // an ordinary change does not trip it, and a real regression does. The
+      // exact percentage quoted in the README is checked separately, by
+      // check-docs, because a floor cannot tell you the prose has gone stale.
+      thresholds: {
+        statements: 85,
+        branches: 78,
+        functions: 78,
+        lines: 86,
+      },
     },
   },
   server: {

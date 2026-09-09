@@ -59,18 +59,18 @@ export function CountryDetail() {
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <Card title="Gold held">
           <p className="text-3xl font-semibold tabular-nums">{formatTonnes(country.reserveTonnes)}</p>
-          <p className="mt-1 text-sm text-ink/50">
+          <p className="mt-1 text-sm text-ink-muted">
             {(country.reserveTonnes * TROY_OUNCES_PER_TONNE).toLocaleString('en-US', {
               maximumFractionDigits: 0,
             })}{' '}
             fine troy ounces
           </p>
-          <p className="mt-2 text-sm text-ink/60">As of {formatDate(country.asOfDate)}</p>
+          <p className="mt-2 text-sm text-ink-muted">As of {formatDate(country.asOfDate)}</p>
         </Card>
 
         <Card title="Value at the current price">
           <p className="text-3xl font-semibold tabular-nums">{formatUsdCompact(value)}</p>
-          <p className="mt-2 text-sm text-ink/60">
+          <p className="mt-2 text-sm text-ink-muted">
             {price
               ? `Tonnes x ${price.benchmark ?? price.providerLabel} of ${formatDate(price.asOfDate)}`
               : 'Price unavailable'}
@@ -80,15 +80,15 @@ export function CountryDetail() {
         <Card title="Share of total reserves">
           {share === null ? (
             <>
-              <p className="text-3xl font-semibold text-ink/30">n/a</p>
-              <p className="mt-2 text-sm text-ink/60">
+              <p className="text-3xl font-semibold text-ink-subtle">n/a</p>
+              <p className="mt-2 text-sm text-ink-muted">
                 This economy does not report total reserve assets alongside its gold.
               </p>
             </>
           ) : (
             <>
               <p className="text-3xl font-semibold tabular-nums">{formatPercent(share)}</p>
-              <p className="mt-2 text-sm text-ink/60">
+              <p className="mt-2 text-sm text-ink-muted">
                 Gold at market over gold plus {formatUsdCompact(country.nonGoldReservesUsd)} of
                 non-gold reserves, reported {formatDate(country.reservesAsOfDate)}. Moves with the
                 gold price.
@@ -101,7 +101,7 @@ export function CountryDetail() {
           <p className="text-3xl font-semibold tabular-nums">
             <Delta fraction={change} />
           </p>
-          <p className="mt-2 text-sm text-ink/60">
+          <p className="mt-2 text-sm text-ink-muted">
             {history.length} monthly observations reported to the IMF.
           </p>
         </Card>
@@ -120,7 +120,7 @@ export function CountryDetail() {
 
       <Card title="Reserve history" subtitle="Tonnes held, as reported month by month">
         {history.length < 2 ? (
-          <p className="py-8 text-sm text-ink/50">
+          <p className="py-8 text-sm text-ink-muted">
             Not enough history reported for a trend line.
           </p>
         ) : (
@@ -170,7 +170,7 @@ export function CountryDetail() {
             </ResponsiveContainer>
           </div>
         )}
-        <p className="mt-3 text-sm text-ink/50">
+        <p className="mt-3 text-sm text-ink-muted">
           Drawn as steps, not a smooth curve: these are month-end reported figures, and a central
           bank's holding does not drift continuously between them. Source: {meta.source}.
         </p>

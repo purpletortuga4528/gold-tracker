@@ -17,7 +17,7 @@ async function get(path, params) {
   } catch {
     throw new Error(`${path}: server returned non-JSON (HTTP ${res.status})`);
   }
-  if (!res.ok) throw new Error(body.error ?? `${path}: HTTP ${res.status}`);
+  if (!res.ok) throw new Error(body?.error ?? `${path}: HTTP ${res.status}`);
   return body;
 }
 

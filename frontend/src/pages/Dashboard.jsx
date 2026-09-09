@@ -43,13 +43,13 @@ export function Dashboard() {
         <Card title="Top 10 combined">
           <dl className="space-y-4">
             <div>
-              <dt className="text-xs uppercase tracking-wide text-ink/50">Gold held</dt>
+              <dt className="text-xs uppercase tracking-wide text-ink-muted">Gold held</dt>
               <dd className="mt-1 text-2xl font-semibold tabular-nums">
                 {formatTonnes(reportedTonnes)}
               </dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wide text-ink/50">
+              <dt className="text-xs uppercase tracking-wide text-ink-muted">
                 Worth at the current price
               </dt>
               <dd className="mt-1 text-2xl font-semibold tabular-nums">
@@ -59,7 +59,7 @@ export function Dashboard() {
               </dd>
             </div>
           </dl>
-          <p className="mt-4 text-sm text-ink/60">
+          <p className="mt-4 text-sm text-ink-muted">
             This is the top ten only, not a world total. The dataset covers economies that report
             to the IMF, so it is not a complete picture of official gold.
           </p>

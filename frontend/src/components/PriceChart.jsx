@@ -39,7 +39,7 @@ export function PriceChart() {
               className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
                 r === range
                   ? 'bg-accent text-on-accent'
-                  : 'bg-ink/5 text-ink/70 hover:bg-ink/10'
+                  : 'bg-ink/5 text-ink-muted hover:bg-ink/10'
               }`}
             >
               {r}
@@ -53,7 +53,7 @@ export function PriceChart() {
 
       {!loading && !error && points.length > 0 && (
         <>
-          <p className="mb-3 text-sm text-ink/60">
+          <p className="mb-3 text-sm text-ink-muted">
             {formatDate(points[0].date)} to {formatDate(points.at(-1).date)} &middot;{' '}
             {points.length.toLocaleString('en-US')} auction days &middot; change{' '}
             <Delta fraction={change} />
@@ -116,7 +116,7 @@ export function PriceChart() {
       )}
 
       {!loading && !error && points.length === 0 && (
-        <p className="py-8 text-sm text-ink/50">No price points in this range.</p>
+        <p className="py-8 text-sm text-ink-muted">No price points in this range.</p>
       )}
     </Card>
   );

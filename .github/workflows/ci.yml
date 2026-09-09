@@ -45,6 +45,11 @@ jobs:
       - name: Frontend tests
         run: npm run test:frontend
 
+      - name: Coverage floor
+        # Thresholds live in frontend/vite.config.js. A floor, not a target:
+        # the exact figure the README quotes is checked by the docs job.
+        run: npm run test:coverage
+
       - name: Production build
         run: npm run build
 
@@ -189,9 +194,11 @@ jobs:
         run: npm run setup
 
       - name: Documented figures still match reality
-        # The static half only. The live half runs in the `live` job, so a
-        # network failure is never mistaken for a stale document.
-        run: npm run check:docs
+        # The static half, plus --counts, which reruns both suites so the test
+        # totals quoted in the README cannot drift. The live half runs in the
+        # `live` job, so a network failure is never mistaken for a stale
+        # document.
+        run: npm run check:docs -- --counts
 
       - name: Reserves snapshot freshness
         # Exits 1 ageing, 2 stale. Reported, not enforced: the snapshot ageing

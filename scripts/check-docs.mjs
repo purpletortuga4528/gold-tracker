@@ -16,9 +16,12 @@
  * Usage:
  *   node scripts/check-docs.mjs            static checks only
  *   node scripts/check-docs.mjs --live     also measure a running API on :5174
+ *   node scripts/check-docs.mjs --counts   also run both suites and check the
+ *                                          test counts quoted in the README
  *
  * Exit codes: 0 all claims hold, 1 at least one is stale.
  */
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -105,6 +108,56 @@ for (const [key, actual] of [
   } else ok(`data/README corrections (${applied.join(', ')})`);
 }
 
+// --- The two US reserve shares quoted in data/README ------------------------
+// The naive one is fixed by the dataset. The restated one moves with the gold
+// price, so the prose quotes the price it was struck at and this recomputes it
+// at exactly that price: a claim tied to a stated input is checkable, one that
+// floats is not.
+{
+  const usa = dataset.countries.find((c) => c.countryCode === 'USA');
+  const validation = JSON.parse(read('backend/data/validation.json'));
+  const OUNCES_PER_TONNE = 1e6 / 31.1034768;
+  const ounces = usa.reserveTonnes * OUNCES_PER_TONNE;
+  const share = (perOunce) => {
+    const gold = ounces * perOunce;
+    return (100 * gold) / (gold + usa.nonGoldReservesUsd);
+  };
+
+  const naive = share(validation.statutoryBookUsdPerOunce);
+  const [quotedNaive] = claims(dataReadme, /at ([\d.]+) percent of US reserves/);
+  if (quotedNaive === undefined) bad('data/README quotes the naive US share', 'no figure found');
+  else if (Math.abs(Number(quotedNaive) - naive) > 0.05) {
+    bad('data/README naive US share', `says ${quotedNaive}%, recomputed ${naive.toFixed(2)}%`);
+  } else ok(`data/README naive US share (${quotedNaive}%)`);
+
+  const m = /gives ([\d.]+) percent at a gold price of \$([\d,]+) an ounce/.exec(dataReadme);
+  if (!m) bad('data/README quotes the restated US share', 'no figure and price found');
+  else {
+    const restated = share(Number(m[2].replace(/,/g, '')));
+    if (Math.abs(Number(m[1]) - restated) > 0.05) {
+      bad('data/README restated US share', `says ${m[1]}% at $${m[2]}, recomputed ${restated.toFixed(2)}%`);
+    } else ok(`data/README restated US share (${m[1]}% at $${m[2]})`);
+  }
+}
+
+// --- The chart's range buttons must match the ranges the API accepts --------
+// price.js says "the list lives in RANGE_MONTHS; do not restate it, it drifts",
+// and PriceChart.jsx restates it, because the buttons render before any API
+// response arrives. That is a reasonable trade and this is the check that makes
+// it safe: a range in the UI that the API rejects is a 400 on a button click.
+{
+  const { SUPPORTED_RANGES } = await import(`file://${resolve(ROOT, 'backend/src/services/price.js')}`);
+  const chart = read('frontend/src/components/PriceChart.jsx');
+  const m = /const RANGES = \[([^\]]*)\]/.exec(chart);
+  if (!m) bad('PriceChart lists its ranges', 'no RANGES array found');
+  else {
+    const inUi = m[1].split(',').map((x) => x.trim().replace(/^'|'$/g, '')).filter(Boolean);
+    if (inUi.join() !== SUPPORTED_RANGES.join()) {
+      bad('chart ranges match the API', `UI has ${inUi.join('/')}, API accepts ${SUPPORTED_RANGES.join('/')}`);
+    } else ok(`chart ranges match the API (${inUi.length}: ${inUi.join(', ')})`);
+  }
+}
+
 // --- No em or en dashes in authored prose ----------------------------------
 for (const [name, text] of [['README.md', readme], ['data/README.md', dataReadme]]) {
   // Escapes, not literals: this file would otherwise trip the very check it
@@ -112,6 +165,60 @@ for (const [name, text] of [['README.md', readme], ['data/README.md', dataReadme
   const n = (text.match(/[\u2013\u2014]/g) ?? []).length;
   if (n) bad(`${name} dash policy`, `${n} em/en dashes present`);
   else ok(`${name} dash policy`);
+}
+
+// --- Test counts quoted in the README, only when asked ---------------------
+// Opt-in because it runs both suites, which takes about fifteen seconds. It
+// earns that: the README said 50 backend tests when there were 71, which is
+// exactly the kind of number that nobody re-checks after adding a test file.
+if (process.argv.includes('--counts')) {
+  // The runners are invoked directly rather than through npm. Going through npm
+  // would need `shell: true` on Windows, because Node refuses to spawn a .cmd
+  // without one and deprecates passing args with one, and a shell is not worth
+  // it to read two numbers. These two commands are the `test` scripts in
+  // backend/package.json and frontend/package.json; if either changes, this
+  // reports that it could not read a total rather than reporting a wrong one.
+  const run = (cwd, args) => {
+    try {
+      return execFileSync(process.execPath, args, { cwd: resolve(ROOT, cwd), encoding: 'utf8', stdio: 'pipe' });
+    } catch (err) {
+      // A failing suite still prints its totals, which is what we are reading.
+      return `${err.stdout ?? ''}${err.stderr ?? ''}`;
+    }
+  };
+  const backendOut = run('backend', ['--test']);
+  // With coverage, so one run answers both the count and the percentage the
+  // README quotes. A floor in vite.config.js catches a regression; this catches
+  // the prose drifting away from the number.
+  const frontendOut = run('frontend', ['node_modules/vitest/vitest.mjs', 'run', '--coverage']);
+  const backend = Number(/^ℹ tests (\d+)$/m.exec(backendOut)?.[1]);
+  const frontend = Number(/Tests\s+(\d+) passed/.exec(frontendOut)?.[1]);
+
+  if (!Number.isFinite(backend) || !Number.isFinite(frontend)) {
+    bad('test counts', 'could not read a total from one of the runners');
+  } else {
+    let anyStale = false;
+    for (const m of readme.matchAll(/(\d+) backend, (\d+) frontend/g)) {
+      if (Number(m[1]) !== backend || Number(m[2]) !== frontend) {
+        bad('README test counts', `says ${m[1]} backend and ${m[2]} frontend, ran ${backend} and ${frontend}`);
+        anyStale = true;
+      }
+    }
+    const [quotedTotal] = claims(readme, /(\d+) of them: \d+ backend/);
+    if (quotedTotal !== undefined && Number(quotedTotal) !== backend + frontend) {
+      bad('README test total', `says ${quotedTotal}, ran ${backend + frontend}`);
+      anyStale = true;
+    }
+    if (!anyStale) ok(`README test counts (${backend} backend, ${frontend} frontend)`);
+  }
+
+  const measured = Number(/All files\s*\|\s*([\d.]+)/.exec(frontendOut)?.[1]);
+  const [quotedCoverage] = claims(readme, /covers (\d+) percent of statements/);
+  if (!Number.isFinite(measured)) bad('frontend coverage', 'no summary row in the vitest output');
+  else if (quotedCoverage === undefined) bad('README quotes frontend coverage', 'no figure found');
+  else if (Math.round(measured) !== Number(quotedCoverage)) {
+    bad('README frontend coverage', `says ${quotedCoverage} percent, measured ${measured}`);
+  } else ok(`README frontend coverage (${quotedCoverage} percent, measured ${measured})`);
 }
 
 // --- Live measurements, only when asked ------------------------------------

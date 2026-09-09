@@ -9,9 +9,9 @@
  *
  * The `--c-*` custom properties below are the real palette and are the only
  * thing that changes between light and dark. The `@theme` block maps Tailwind's
- * colour names onto them, so a class like `bg-surface` or `text-ink/60` resolves
- * through the palette and flips automatically. No `dark:` variants are needed
- * anywhere in the components.
+ * colour names onto them, so a class like `bg-surface` or `text-ink-muted`
+ * resolves through the palette and flips automatically. No `dark:` variants are
+ * needed anywhere in the components.
  *
  * There is deliberately no `prefers-color-scheme` media query here. The boot
  * script in index.html resolves "system" to an explicit `data-theme` on <html>
@@ -27,6 +27,13 @@
   --c-surface: #ffffff;
   --c-raised: #fdf9ed;
   --c-ink: #1a1714;
+  /* Secondary text is a solid colour, not ink at reduced opacity. Opacity is
+     what broke this before: `text-ink/40` on the canvas measures 2.52:1, which
+     fails AA, and no palette change can fix it because the fade happens after
+     the palette. Both tiers clear 4.5:1 against every ground in this theme,
+     and palette.test.js asserts it. */
+  --c-ink-muted: #5a5349;
+  --c-ink-subtle: #6b6257;
   --c-line: #ece4d3;
   --c-line-soft: #f5efe2;
 
@@ -47,7 +54,10 @@
 
   --c-warn-bg: #fffbeb;
   --c-warn-line: #fcd9a0;
-  --c-warn-ink: #703b0a;
+  /* Darkened from #703b0a. The freshness banner renders this at 70 percent
+     opacity, which put it at 4.03:1 on the warn ground: under AA, and invisible
+     to a check that only looked at the flat colour. */
+  --c-warn-ink: #552b06;
 
   --c-danger-bg: #fef2f2;
   --c-danger-line: #fbc9c9;
@@ -72,6 +82,8 @@
   --c-surface: #1c1916;
   --c-raised: #241f19;
   --c-ink: #f2ece2;
+  --c-ink-muted: #c4baab;
+  --c-ink-subtle: #a89e90;
   --c-line: #352f27;
   --c-line-soft: #2a251f;
 
@@ -119,6 +131,8 @@
   --c-surface: #ffffff;
   --c-raised: #ffffff;
   --c-ink: #000000;
+  --c-ink-muted: #000000;
+  --c-ink-subtle: #000000;
   --c-line: #000000;
   --c-line-soft: #000000;
 
@@ -156,6 +170,8 @@
   --c-surface: #000000;
   --c-raised: #000000;
   --c-ink: #ffffff;
+  --c-ink-muted: #ffffff;
+  --c-ink-subtle: #ffffff;
   --c-line: #ffffff;
   --c-line-soft: #ffffff;
 
@@ -193,6 +209,8 @@
   --color-surface: var(--c-surface);
   --color-raised: var(--c-raised);
   --color-ink: var(--c-ink);
+  --color-ink-muted: var(--c-ink-muted);
+  --color-ink-subtle: var(--c-ink-subtle);
   --color-line: var(--c-line);
   --color-line-soft: var(--c-line-soft);
 
@@ -269,27 +287,22 @@ body {
 }
 
 /*
- * The palette above is only half the job. Secondary text throughout the app is
- * ink at reduced opacity (`text-ink/50` and friends), which Tailwind compiles
- * to a color-mix against transparent. Pure black at 50 percent on white is
- * #808080, about 3.9:1, so a high-contrast palette with faded text on top of it
- * would still fail. These rules restore full opacity to exactly those
- * utilities, which is the difference between a darker page and a readable one.
+ * Secondary text used to be ink at reduced opacity (`text-ink/50` and friends),
+ * which Tailwind compiles to a color-mix against transparent. That is a trap:
+ * pure black at 50 percent on white is #808080, about 3.9:1, and the fade
+ * happens after the palette, so no palette can rescue it. High contrast patched
+ * it by restoring full opacity on a hand-listed set of generated class names,
+ * which left the default appearance failing AA and meant any new opacity step
+ * silently reopened the hole.
  *
- * They target generated class names, so if a new opacity step is used in a
- * component it needs adding here. The contrast audit in the README is the check
- * that catches it.
+ * Secondary text is now --c-ink-muted and --c-ink-subtle: solid colours, chosen
+ * per theme, checked by palette.test.js. High contrast sets both to full ink in
+ * the palette above, so there is nothing to patch here any more.
+ *
+ * The warn and danger inks below are still opacity steps. They sit on tinted
+ * grounds that go pure white or pure black under high contrast, so they do need
+ * restoring, and palette.test.js covers their composited result too.
  */
-:root[data-contrast='high'] :is(
-    .text-ink\/30,
-    .text-ink\/40,
-    .text-ink\/50,
-    .text-ink\/60,
-    .text-ink\/70
-  ) {
-  color: var(--c-ink);
-}
-
 :root[data-contrast='high'] :is(
     .text-warn-ink\/70,
     .text-warn-ink\/80,

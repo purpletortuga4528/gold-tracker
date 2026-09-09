@@ -51,7 +51,10 @@ const INDICATORS = {
 /** Preferred order when an economy reports under more than one SECTOR code. */
 const SECTOR_PREFERENCE = ['S1XS1311', 'S1X', 'S1311'];
 
-const NAME_OVERRIDES = { EZB: 'European Central Bank' };
+// A Map, not an object literal: `code` below comes from the IMF feed, and
+// `NAME_OVERRIDES[code]` would return an inherited function for a REF_AREA of
+// `constructor` or `toString`, which then becomes the entry's name.
+const NAME_OVERRIDES = new Map([['EZB', 'European Central Bank']]);
 const INSTITUTION_CODES = new Set(['EZB']);
 
 function arg(name, fallback) {
@@ -193,12 +196,14 @@ export function classifyValuation({ rawOunces, reportedUsd, referencePrice, conf
  *
  * Condition 1 is what makes this safe, and it was added after the ratio test
  * alone produced two false positives. Korea reports 3,360,000 oz, correctly,
- * being 104.5 t, but carries the gold at cost near $1,427/oz; in months where
- * that book rate happens to sit near a tenth of the market price, a pure ratio
- * test "corrects" a figure that was right all along. Tunisia behaves the same
- * way. Requiring the tonnage to be impossible first removes that whole class
- * of error: if the number is believable as filed, it is left alone whatever
- * the reporter's valuation habits.
+ * being 104.5 t. It carries the gold at cost, which is $1,427/oz today but was
+ * about $172/oz in late 2010 and the first half of 2011, when the fix ran
+ * $1,383 to $1,536: ten times $172 lands inside the tolerance, so 7 of its 199
+ * filings match, and a country-wide divisor taken from them would have divided
+ * the whole series by ten. Tunisia does the same at a factor of a hundred, in
+ * 42 of its 113 filings. Requiring the tonnage to be impossible first removes
+ * that whole class of error: if the number is believable as filed, it is left
+ * alone whatever the reporter's valuation habits.
  *
  * @returns {{divisor: number, basis: string, impliedUsdPerOunce: number} | null}
  */
@@ -507,7 +512,7 @@ async function main() {
   for (const [code, goldOz] of fetched.goldOunces.byCountry) {
     const result = buildEntry({
       code,
-      name: NAME_OVERRIDES[code] ?? countryNames.get(code) ?? code,
+      name: NAME_OVERRIDES.get(code) ?? countryNames.get(code) ?? code,
       kind: classify(code),
       region: regions.get(code) ?? null,
       goldOz,

@@ -25,7 +25,7 @@ export default function App() {
                 <span className="text-xl font-semibold tracking-tight">
                   Gold Tracker
                 </span>
-                <span className="text-sm text-ink/50">reserves and price</span>
+                <span className="text-sm text-ink-muted">reserves and price</span>
               </div>
               <div className="flex items-center gap-3">
                 <nav className="flex gap-1">
@@ -38,7 +38,7 @@ export default function App() {
                         `rounded-md px-3 py-1.5 text-sm font-medium transition ${
                           isActive
                             ? "bg-accent-soft text-accent-strong"
-                            : "text-ink/70 hover:bg-ink/5"
+                            : "text-ink-muted hover:bg-ink/5"
                         }`
                       }
                     >
@@ -61,7 +61,7 @@ export default function App() {
               <Route
                 path="*"
                 element={
-                  <p className="py-16 text-center text-ink/50">
+                  <p className="py-16 text-center text-ink-muted">
                     Page not found.
                   </p>
                 }
@@ -69,7 +69,7 @@ export default function App() {
             </Routes>
           </main>
 
-          <footer className="mx-auto max-w-6xl px-4 pb-10 text-xs text-ink/40">
+          <footer className="mx-auto max-w-6xl px-4 pb-10 text-xs text-ink-subtle">
             Reserves from the IMF. Price from the LBMA daily auction unless
             configured otherwise. Neither is investment advice, and neither is a
             complete picture of the world's official gold.

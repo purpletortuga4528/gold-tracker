@@ -12,16 +12,17 @@ import { config } from '../config.js';
  *   /api/reserves                    29 kB
  *   /api/price/history?range=max    694 kB   <-- the amplifier
  *
- * A ~60 byte request returning 694 kB is the case worth bounding: served at the
- * general limit that is over 400 MB a minute of egress to one caller, so the
+ * A 67 byte request returning 694 kB is the case worth bounding: served at the
+ * general limit that is 417 MB a minute of egress to one caller, so the
  * history route gets its own tighter bucket on top of the general one, which
  * brings it to roughly 31 MB a minute. Recompute both if you change a limit.
  *
- * Limits are sized against what the app itself does rather than a guess. One
- * Compare page load with six countries fires 20 requests in about 0.03
- * seconds, and React StrictMode doubles that again in development. A short
- * window, or a limit in the low tens, would reject the app's own normal
- * behaviour, which is worse than not limiting at all.
+ * Limits are sized against what the app itself does rather than a guess. A cold
+ * Compare load with six countries fires 10 requests inside a millisecond, and
+ * React StrictMode doubles that to 20 in development. A short window, or a
+ * limit in the low tens, would reject the app's own normal behaviour, which is
+ * worse than not limiting at all. Browsing five pages, one of them that
+ * Compare, comes to 15 requests in all.
  */
 
 const jsonLimitHandler = (_req, res) => {

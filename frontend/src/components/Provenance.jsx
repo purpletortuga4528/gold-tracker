@@ -12,7 +12,7 @@ export function Provenance({ meta }) {
     <Card title="About this data" className="text-sm">
       <dl className="grid gap-3 sm:grid-cols-2">
         <div>
-          <dt className="text-xs uppercase tracking-wide text-ink/50">Reserves source</dt>
+          <dt className="text-xs uppercase tracking-wide text-ink-muted">Reserves source</dt>
           <dd className="mt-1">
             {safeHttpUrl(meta.sourceUrl) ? (
               <a
@@ -29,7 +29,7 @@ export function Provenance({ meta }) {
           </dd>
         </div>
         <div>
-          <dt className="text-xs uppercase tracking-wide text-ink/50">Coverage</dt>
+          <dt className="text-xs uppercase tracking-wide text-ink-muted">Coverage</dt>
           <dd className="mt-1">
             {meta.countryCount} reporting economies &middot; latest figure{' '}
             {formatDate(meta.latestAsOfDate)} &middot; snapshot built{' '}
@@ -38,7 +38,7 @@ export function Provenance({ meta }) {
         </div>
       </dl>
 
-      <ul className="mt-4 space-y-2 text-ink/70">
+      <ul className="mt-4 space-y-2 text-ink-muted">
         <li>{meta.indicatorNote}</li>
         <li>{meta.valuationNote}</li>
         {meta.shareNote && <li>{meta.shareNote}</li>}

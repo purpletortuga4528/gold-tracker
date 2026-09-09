@@ -6,6 +6,27 @@ const int = (value, fallback) => {
 };
 
 /**
+ * Like `int`, but refuses a value that would break the thing it configures.
+ *
+ * A rate limit is a security control, and `RATE_LIMIT_GENERAL=0` does not mean
+ * "no limit": express-rate-limit v7 and later answer every request with 429, so
+ * a typo takes the whole API offline. A negative value does the same. Falling
+ * back to the default and saying so out loud is the only outcome that is not a
+ * surprise later.
+ */
+const positiveInt = (value, fallback, name) => {
+  if (value === undefined || value === null || String(value).trim() === '') return fallback;
+  // Number, not parseInt. parseInt reads "1.5" as 1 and "600abc" as 600, so a
+  // mistyped limit would become a different, valid-looking limit rather than an
+  // error. Silently honouring half of what was written is the failure this
+  // whole helper exists to avoid.
+  const n = Number(value);
+  if (Number.isInteger(n) && n > 0) return n;
+  console.warn(`[config] ${name}="${value}" is not a positive whole number. Using ${fallback}.`);
+  return fallback;
+};
+
+/**
  * Parses TRUST_PROXY into a value Express actually understands.
  *
  * Environment variables are always strings, and Express treats a string as an
@@ -29,7 +50,7 @@ function parseTrustProxy(raw) {
 }
 
 export const config = {
-  port: int(process.env.PORT, 5174),
+  port: positiveInt(process.env.PORT, 5174, 'PORT'),
 
   /**
    * Which price provider to use. "lbma" needs no key and is the default.
@@ -37,33 +58,33 @@ export const config = {
    */
   priceProvider: process.env.PRICE_PROVIDER ?? 'lbma',
 
-
   /** Cache lifetimes in seconds. */
   cache: {
     // The LBMA benchmark is set twice a day, so re-fetching often buys nothing.
-    // Keyed spot providers move constantly but also meter your free tier.
+    // A provider that quotes live spot would want a shorter one, and would also
+    // be metering your calls. Zero is allowed here: it means do not cache.
     spotSeconds: int(process.env.CACHE_SPOT_SECONDS, 300),
     historySeconds: int(process.env.CACHE_HISTORY_SECONDS, 6 * 60 * 60),
   },
 
   /**
    * Requests per minute per client IP. Sized against what the app itself does:
-   * one Compare page load with six countries is 20 requests in a fraction of a
-   * second, doubled again by React StrictMode in development.
+   * a cold Compare load with six countries is 10 requests inside a millisecond,
+   * which React StrictMode doubles to 20 in development.
    */
   rateLimit: {
-    // 600/min. One Compare page load is 20 requests, so this is about 30 such
-    // loads a minute. 300 was the first choice and is roughly 15 loads, which
-    // is close enough to real development activity to risk throttling the
-    // person working on the app.
-    general: int(process.env.RATE_LIMIT_GENERAL, 600),
-    // /api/price/history?range=max returns 694 kB from a 60 byte request, so
+    // 600/min. A Compare load is 10 requests, or 20 under StrictMode, so this
+    // is 30 such loads a minute even in development. 300 was the first choice
+    // and is 15, which is close enough to real development activity to risk
+    // throttling the person working on the app.
+    general: positiveInt(process.env.RATE_LIMIT_GENERAL, 600, 'RATE_LIMIT_GENERAL'),
+    // /api/price/history?range=max returns 694 kB for a 67 byte request, so
     // this bucket is what actually caps egress: 45/min is about 31 MB/min.
     // Generous for a human, who would have to sweep all eight range buttons
-    // three times over in a minute to reach it.
-    priceHistory: int(process.env.RATE_LIMIT_PRICE_HISTORY, 45),
+    // more than five times over in a minute to reach it.
+    priceHistory: positiveInt(process.env.RATE_LIMIT_PRICE_HISTORY, 45, 'RATE_LIMIT_PRICE_HISTORY'),
     // Monitors poll this; throttling it would fake an outage.
-    health: int(process.env.RATE_LIMIT_HEALTH, 1200),
+    health: positiveInt(process.env.RATE_LIMIT_HEALTH, 1200, 'RATE_LIMIT_HEALTH'),
   },
 
   /**

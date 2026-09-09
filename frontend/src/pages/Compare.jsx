@@ -111,7 +111,7 @@ export function Compare() {
         }
       >
         {codes.length === 0 && (
-          <p className="py-6 text-sm text-ink/60">
+          <p className="py-6 text-sm text-ink-muted">
             Nothing selected yet. Add one above, or tick a few rows on the{' '}
             <Link to="/countries" className="text-accent-strong underline underline-offset-2">
               countries page
@@ -156,7 +156,7 @@ export function Compare() {
           <div className="table-scroll">
             <table className="w-full min-w-[40rem] border-collapse text-sm">
               <thead>
-                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-ink/50">
+                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-ink-muted">
                   <th className="px-3 py-2 font-medium">Country</th>
                   <th className="px-3 py-2 text-right font-medium">Tonnes</th>
                   <th className="px-3 py-2 text-right font-medium">Value now</th>
@@ -195,12 +195,12 @@ export function Compare() {
                         return Number.isFinite(ch) ? `${ch >= 0 ? '+' : ''}${(ch * 100).toFixed(1)}%` : '--';
                       })()}
                     </td>
-                    <td className="px-3 py-2 text-ink/50">{formatDate(c.asOfDate)}</td>
+                    <td className="px-3 py-2 text-ink-muted">{formatDate(c.asOfDate)}</td>
                     <td className="px-3 py-2 text-right">
                       <button
                         type="button"
                         onClick={() => removeCode(c.countryCode)}
-                        className="text-xs text-ink/40 hover:text-negative"
+                        className="text-xs text-ink-subtle hover:text-negative"
                       >
                         remove
                       </button>
@@ -265,7 +265,7 @@ export function Compare() {
               </LineChart>
             </ResponsiveContainer>
           </div>
-          <p className="mt-3 text-sm text-ink/50">
+          <p className="mt-3 text-sm text-ink-muted">
             Gaps mean that economy did not report that month, not that its holding fell to zero.
           </p>
         </Card>

@@ -26,7 +26,7 @@ export function PriceHeadline() {
         <span className="text-5xl font-semibold tabular-nums tracking-tight">
           {formatPrice(price.priceUsdPerOunce)}
         </span>
-        <span className="pb-1.5 text-sm text-ink/60">per troy ounce</span>
+        <span className="pb-1.5 text-sm text-ink-muted">per troy ounce</span>
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -36,10 +36,10 @@ export function PriceHeadline() {
         {price.stale && <Pill tone="warn">Stale: last refresh failed</Pill>}
       </div>
 
-      {price.note && <p className="mt-3 text-sm text-ink/60">{price.note}</p>}
+      {price.note && <p className="mt-3 text-sm text-ink-muted">{price.note}</p>}
 
       {price.alternates && (
-        <p className="mt-2 text-sm text-ink/50">
+        <p className="mt-2 text-sm text-ink-muted">
           Same fix in other currencies:{' '}
           {Object.entries(price.alternates)
             .filter(([, v]) => Number.isFinite(v))

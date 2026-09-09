@@ -49,13 +49,22 @@ carry it at market, and many at historical cost. So:
 
 Reading the share straight off the IMF figures gives nonsense. It puts US gold
 at 4.4 percent of US reserves against a published figure of about 84 percent.
-The restated calculation gives 82.7 percent.
+The restated calculation gives 82.6 percent at a gold price of $4,399 an ounce,
+the LBMA PM fix on 2026-09-08. That figure moves with the price by design, so
+it is quoted with the price it was struck at rather than as a constant.
+`check:docs` recomputes both from the dataset and fails if either drifts.
 
-Spot-checked against twelve published shares: ten land within three points, the
-Netherlands is out by 3.1 and Turkiye by 6.8. Exact agreement is not expected,
-because the published figures are a different vintage from the month-end data
-here and are struck at a different gold price. Treat the share as indicative
-rather than as a reproduction of anyone's published number.
+When the calculation was written it was spot-checked against twelve published
+shares: ten landed within three points, with the Netherlands out by 3.1 and
+Turkiye by 6.8. Two cautions about that sentence. The comparison was a one-off
+and no check here reproduces it, so it says nothing about today's figures. And
+the list of published shares it used was not recorded, so it cannot be repeated
+as it stands; the World Gold Council is the obvious place to draw a fresh one.
+
+Exact agreement is not expected in any case, because published figures are a
+different vintage from the month-end data here and are struck at a different
+gold price. Treat the share as indicative rather than as a reproduction of
+anyone's published number.
 
 ## Unit errors, and how they are caught
 
@@ -77,12 +86,17 @@ false positives.
 
 Reporters that carry gold at historical cost have an implied price that drifts
 as they buy at different prices, and at some point it can pass close to a power
-of ten below the market price. Korea's filings imply about $172 an ounce in
-2010 and 2011, when gold was $1,383 to $1,536: multiply by ten and 7 of its 199
-filings look like a match, so a pure ratio test would have "corrected" 3,360,000
-oz, correctly 104.5 t, down to 336,000 oz, or 10.5 t. Tunisia is the same class of error at a
-different factor, implying $12 to $14 an ounce against a market around $1,200,
-where 42 of its 113 filings would have matched at a factor of one hundred.
+of ten below the market price. Korea's filings imply about $172 an ounce
+throughout late 2010 and the first half of 2011, when the fix ran $1,383 to
+$1,536: multiply by ten and 7 of its 199 filings land inside the tolerance. A
+country-wide divisor drawn from those 7 would then have been applied to the
+whole series, "correcting" Korea's current 3,360,000 oz, correctly 104.5 t,
+down to 336,000 oz, or 10.5 t.
+
+Tunisia is the same class of error at a different factor. Its filings imply $12
+to $15 an ounce, and 42 of its 113 matched at a factor of one hundred, across
+2010 to 2013 with the fix between $1,169 and $1,814. Tunisia holds 6.8 t, which
+a hundredfold correction would have reported as 0.1 t.
 
 The sharpest case is the United States itself. It carries gold at the statutory
 $42.2222 an ounce; multiply by one hundred and you get $4,222, within about five

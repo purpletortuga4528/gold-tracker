@@ -5,17 +5,23 @@ import { config } from '../config.js';
  * Rate limiting.
  *
  * Three buckets, because the endpoints do not cost the same thing. Measured
- * response sizes:
+ * response sizes, uncompressed and gzipped:
  *
- *   /api/health                     0.3 kB
- *   /api/price/current              0.3 kB
- *   /api/reserves                    29 kB
- *   /api/price/history?range=max    694 kB   <-- the amplifier
+ *   /api/health                     0.3 kB    not compressed, under the threshold
+ *   /api/price/current              0.3 kB    not compressed, under the threshold
+ *   /api/reserves                    29 kB -> 4.5 kB
+ *   /api/price/history?range=max    694 kB -> 83 kB   <-- the amplifier
  *
- * A 67 byte request returning 694 kB is the case worth bounding: served at the
- * general limit that is 417 MB a minute of egress to one caller, so the
+ * The sizes that matter here are the uncompressed ones, and that is not an
+ * oversight. Compression is something the caller asks for: send
+ * `Accept-Encoding: identity` and the 694 kB arrives in full. A browser gets
+ * the small number, an adversary chooses, and a limit is sized against the
+ * choice it does not control.
+ *
+ * So: a 67 byte request returning 694 kB is the case worth bounding. Served at
+ * the general limit that is 417 MB a minute of egress to one caller, so the
  * history route gets its own tighter bucket on top of the general one, which
- * brings it to roughly 31 MB a minute. Recompute both if you change a limit.
+ * brings it to 31 MB a minute. Recompute both if you change a limit.
  *
  * Limits are sized against what the app itself does rather than a guess. A cold
  * Compare load with six countries fires 10 requests inside a millisecond, and

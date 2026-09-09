@@ -9,8 +9,8 @@ async function serve() {
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${server.address().port}`;
   return {
-    get: async (path) => {
-      const res = await fetch(base + path);
+    get: async (path, headers) => {
+      const res = await fetch(base + path, headers ? { headers } : undefined);
       const text = await res.text();
       let body;
       try {
@@ -183,4 +183,41 @@ test('numberParam enforces its bounds', () => {
   assert.throws(() => numberParam({ n: '11' }, 'n', { min: 1, max: 10 }), HttpError);
   assert.throws(() => numberParam({ n: 'abc' }, 'n'), HttpError);
   assert.throws(() => numberParam({ n: 'Infinity' }, 'n'), HttpError);
+});
+
+test('large responses are compressed, small ones are not', async () => {
+  // The history payload is why the middleware is there at all: 694 kB of JSON
+  // was going out whole on every chart load, and it is 83 kB gzipped. Small
+  // bodies stay uncompressed, because the header and the CPU cost more than
+  // anything they would save.
+  const s = await serve();
+  try {
+    const big = await s.get('/api/price/history?range=max', { 'accept-encoding': 'gzip' });
+    assert.equal(big.headers.get('content-encoding'), 'gzip', 'the 694 kB payload should be compressed');
+    assert.match(
+      big.headers.get('vary') ?? '',
+      /accept-encoding/i,
+      'a response that varies by encoding must say so, or a shared cache will serve the wrong one',
+    );
+
+    const small = await s.get('/api/health', { 'accept-encoding': 'gzip' });
+    assert.equal(small.headers.get('content-encoding'), null, 'a 0.3 kB body is not worth compressing');
+  } finally {
+    await s.stop();
+  }
+});
+
+test('a caller that declines compression still gets the whole body', async () => {
+  // This is why the history bucket is sized against the uncompressed figure.
+  // The saving is real for a browser and entirely optional for everyone else,
+  // so 694 kB remains what one request can cost if the caller wants it to.
+  const s = await serve();
+  try {
+    const res = await s.get('/api/price/history?range=1y', { 'accept-encoding': 'identity' });
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('content-encoding'), null);
+    assert.ok(Array.isArray(res.body.points) && res.body.points.length > 0, 'body should still be complete');
+  } finally {
+    await s.stop();
+  }
 });

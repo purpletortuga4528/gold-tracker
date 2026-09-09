@@ -37,7 +37,7 @@ installing only the backend on 20.6 and serving real data from it. Developed on
 Node 24.
 
 ```bash
-npm test            # both suites: 75 backend, 151 frontend
+npm test            # both suites: 77 backend, 151 frontend
 npm run test:backend
 npm run test:frontend
 npm run test:coverage
@@ -302,7 +302,7 @@ straight out of `index.css` and composited in Node, so
 ground it can land on, including the tinted chips, in all four modes. No
 browser, no CSS engine, and it runs in CI with the rest of the suite.
 
-**The tests cover behaviour, not lines.** 226 of them: 75 backend, 151 frontend.
+**The tests cover behaviour, not lines.** 228 of them: 77 backend, 151 frontend.
 The frontend suite covers 86 percent of statements with `coverage.all` enabled,
 so untested files count as zero rather than being left out of the report. What
 is deliberately not covered is `App.jsx`, `Dashboard.jsx` and `PriceChart.jsx`:
@@ -379,6 +379,21 @@ before first paint and so cannot be a separate request, and `style-src-attr
 render unstyled without it. No external origin appears in the policy at all: the
 typeface is self-hosted and the API is same-origin.
 
+**Responses are compressed**, which is the largest single thing this server
+does to anyone's connection. The chart's full history is 694 kB of JSON and the
+app bundle is 624 kB; they are 83 kB and 180 kB over the wire. A first load
+drops from about 700 kB to about 250 kB. Bodies under 1 kB are left alone,
+because the header and the CPU cost more than they would save, and the fonts
+are `woff2`, which is already compressed.
+
+Worth saying why this is safe rather than just fast, since compressing a
+response is not always either. BREACH needs a secret in the body and
+attacker-influenced text beside it, so that the compressed length leaks the
+secret a byte at a time. Nothing here qualifies: no authentication, no session,
+no cookie, no per-caller data. Every response is the same public JSON for
+everyone. If that ever stops being true, the middleware in `app.js` is the line
+to revisit before the feature ships.
+
 If the app has not been built, the API says so on a plain page pointing at
 `npm run build`, rather than serving a broken page or a bare 404.
 
@@ -431,7 +446,7 @@ Three buckets, because the endpoints do not cost the same thing:
 | Bucket | Limit | Why |
 |---|---|---|
 | general (`/api/*`) | 600/min | Browsing five pages uses 15 |
-| `/api/price/history` | 45/min | `?range=max` returns **694 kB** for a 67 byte request. This is what actually caps egress |
+| `/api/price/history` | 45/min | `?range=max` is **694 kB** for a 67 byte request, 83 kB compressed. This is what actually caps egress |
 | `/api/health` | 1200/min | A monitor polls it; throttling it would fake an outage |
 
 Limits are sized against measured behaviour, not guessed. A cold Compare load
@@ -444,6 +459,12 @@ replays that doubled burst and asserts none of it is rejected.
 Browsing five pages, one of them that Compare, is 15 requests in total. The
 600 limit is forty times that, which is the point: it is there to stop a loop,
 not to ration a reader.
+
+The history bucket is sized against the **uncompressed** figure, which is
+deliberate. Compression is something the caller asks for: `Accept-Encoding:
+identity` and the 694 kB arrives whole. A browser gets 83 kB, an adversary
+chooses, and a limit is worth sizing against the choice it does not control. So
+45/min is 31 MB a minute at worst and 3.8 at best.
 
 The buckets are separate on purpose: exhausting the history limit leaves the
 price headline and the reserves table working, and only the chart card errors.

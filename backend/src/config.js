@@ -90,10 +90,12 @@ export const config = {
     // and is 15, which is close enough to real development activity to risk
     // throttling the person working on the app.
     general: positiveInt(process.env.RATE_LIMIT_GENERAL, 600, 'RATE_LIMIT_GENERAL'),
-    // /api/price/history?range=max returns 694 kB for a 67 byte request, so
-    // this bucket is what actually caps egress: 45/min is about 31 MB/min.
-    // Generous for a human, who would have to sweep all eight range buttons
-    // more than five times over in a minute to reach it.
+    // /api/price/history?range=max returns 694 kB for a 67 byte request, or
+    // 83 kB to a caller that accepts compression. This bucket is what caps
+    // egress, and it is sized against the uncompressed figure because that is
+    // the one the caller can insist on: 45/min is 31 MB/min at worst, 3.8 at
+    // best. Generous for a human, who would have to sweep all eight range
+    // buttons more than five times over in a minute to reach it.
     priceHistory: positiveInt(process.env.RATE_LIMIT_PRICE_HISTORY, 45, 'RATE_LIMIT_PRICE_HISTORY'),
     // Monitors poll this; throttling it would fake an outage.
     health: positiveInt(process.env.RATE_LIMIT_HEALTH, 1200, 'RATE_LIMIT_HEALTH'),

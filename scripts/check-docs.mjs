@@ -22,6 +22,7 @@
  * Exit codes: 0 all claims hold, 1 at least one is stale.
  */
 import { execFileSync } from 'node:child_process';
+import { get as httpGet } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -240,19 +241,68 @@ if (process.argv.includes('--live')) {
   const base = `http://127.0.0.1:${config.port}`;
   const size = async (path) => (await (await fetch(base + path)).text()).length;
   try {
+    // A claim this cannot find is a FAILURE, not a pass. The first version
+    // compared `Number(undefined)`, and NaN fails every comparison, so
+    // rewording the sentence around the figure turned the check green while it
+    // was reading nothing at all. A checker that reports "ok" for a claim it
+    // could not locate is worse than no checker.
     const history = await size('/api/price/history?range=max');
     const kB = Math.round(history / 1000);
-    const [quoted] = claims(readme, /returns \*\*(\d+) kB\*\*/);
-    // Prices are appended daily, so allow the series to grow a little.
-    if (Math.abs(Number(quoted) - kB) > 25) {
+    const [quoted] = claims(readme, /is \*\*(\d+) kB\*\* for a \d+ byte request/);
+    if (quoted === undefined) {
+      bad('README history payload size', 'no figure found; has the sentence been reworded?');
+    } else if (Math.abs(Number(quoted) - kB) > 25) {
+      // Prices are appended daily, so allow the series to grow a little.
       bad('README history payload size', `says ${quoted} kB, measured ${kB} kB`);
     } else ok(`README history payload size (${quoted} kB, measured ${kB} kB)`);
 
-    const reserves = Math.round((await size('/api/reserves')) / 1000);
-    const [quotedR] = claims(dataReadme.concat(readme), /\/api\/reserves\s+(\d+) kB/);
-    if (quotedR && Math.abs(Number(quotedR) - reserves) > 5) {
-      bad('reserves payload size', `prose says ${quotedR} kB, measured ${reserves} kB`);
-    } else ok(`reserves payload size (measured ${reserves} kB)`);
+    // The size table lives in the rate limiter's own docblock, which is the
+    // file that acts on those numbers. Both columns are checked: uncompressed,
+    // and what a caller accepting gzip actually receives.
+    const limiterSource = read('backend/src/lib/rateLimit.js');
+    // node:http, not fetch. undici decompresses transparently, so `fetch` hands
+    // back the decoded body and measuring it reports the uncompressed size with
+    // no sign that anything was wrong. Counting raw socket bytes is the only
+    // way to measure what actually crossed the wire.
+    const gzipped = (path) =>
+      new Promise((resolveSize, rejectSize) => {
+        const req = httpGet(
+          { host: '127.0.0.1', port: config.port, path, headers: { 'accept-encoding': 'gzip' } },
+          (res) => {
+            if (res.headers['content-encoding'] !== 'gzip') {
+              res.resume();
+              resolveSize(null);
+              return;
+            }
+            let bytes = 0;
+            res.on('data', (chunk) => { bytes += chunk.length; });
+            res.on('end', () => resolveSize(Math.round(bytes / 1000)));
+          },
+        );
+        req.on('error', rejectSize);
+      });
+
+    for (const [label, path, re, tolerance] of [
+      ['reserves', '/api/reserves', /\/api\/reserves\s+(\d+) kB -> ([\d.]+) kB/, 5],
+      ['history', '/api/price/history\?range=max', /range=max\s+(\d+) kB -> (\d+) kB/, 25],
+    ]) {
+      const m = re.exec(limiterSource);
+      if (!m) {
+        bad(`rateLimit.js quotes the ${label} size`, 'the table row could not be read');
+        continue;
+      }
+      const plain = Math.round((await size(path.replace('\?', '?'))) / 1000);
+      if (Math.abs(Number(m[1]) - plain) > tolerance) {
+        bad(`rateLimit.js ${label} size`, `says ${m[1]} kB, measured ${plain} kB`);
+        continue;
+      }
+      const small = await gzipped(path.replace('\?', '?'));
+      if (small === null) {
+        bad(`rateLimit.js ${label} compressed size`, 'the response came back uncompressed');
+      } else if (Math.abs(Number(m[2]) - small) > Math.max(1, tolerance / 5)) {
+        bad(`rateLimit.js ${label} compressed size`, `says ${m[2]} kB, measured ${small} kB`);
+      } else ok(`rateLimit.js ${label} size (${m[1]} kB, ${m[2]} kB gzipped; measured ${plain} and ${small})`);
+    }
   } catch (err) {
     bad('live measurements', `could not reach ${base}: ${err.message}. Start the API or drop --live.`);
   }

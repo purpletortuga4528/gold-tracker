@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import cors from 'cors';
 import { config } from './config.js';
 import { priceRouter } from './routes/price.js';
@@ -18,6 +19,27 @@ export function createApp() {
 
   const allowAny = config.corsOrigins.includes('*');
   app.use(cors({ origin: allowAny ? true : config.corsOrigins }));
+
+  /*
+   * Compression, early enough to cover the API and the built app alike.
+   *
+   * This is not a micro-optimisation. `/api/price/history?range=max` is 694 kB
+   * of JSON and the app bundle is 624 kB, and both were going out whole. They
+   * are 74 kB and 180 kB compressed. It is the single largest thing this
+   * server does to anybody's connection.
+   *
+   * On BREACH, which is the reason to think before turning this on: the attack
+   * needs a secret in the response body and attacker-influenced text beside it,
+   * so that compressed length leaks the secret. Nothing here qualifies. There
+   * is no authentication, no session, no cookie, no per-caller data: every
+   * response is the same public JSON for every caller. If any of that ever
+   * stops being true, revisit this line before adding the feature.
+   *
+   * The default 1 kB threshold is left alone, so the small JSON endpoints stay
+   * uncompressed rather than paying the CPU and header cost for nothing.
+   */
+  app.use(compression());
+
   app.use(securityHeaders);
   app.disable('x-powered-by');
 

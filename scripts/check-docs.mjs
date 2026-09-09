@@ -1,0 +1,148 @@
+#!/usr/bin/env node
+/**
+ * Checks that figures quoted in the documentation still match reality.
+ *
+ * This exists because the same failure kept happening: a number measured once,
+ * written into prose, and then quietly falsified by a later change. The rate
+ * limit egress figure said 200 MB after the limit had been doubled to 600. A
+ * note said Switzerland sat 8 percent off the market price, measured before
+ * detection was fixed to price each filing at its own month, after which it was
+ * 0.1 percent. A comment said search responses were 29 kB each when the real
+ * range was 3.5 to 20.7 kB. Prose does not fail a test suite, so it drifted.
+ *
+ * Everything here is derived from the config, the dataset or a live response.
+ * Nothing is hardcoded twice: if a check needs a magic number, it is wrong.
+ *
+ * Usage:
+ *   node scripts/check-docs.mjs            static checks only
+ *   node scripts/check-docs.mjs --live     also measure a running API on :5174
+ *
+ * Exit codes: 0 all claims hold, 1 at least one is stale.
+ */
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const read = (rel) => readFileSync(resolve(ROOT, rel), 'utf8');
+
+const results = [];
+const ok = (what) => results.push({ pass: true, what });
+const bad = (what, detail) => results.push({ pass: false, what, detail });
+
+/** First capture group of `re` in `text`, or undefined. Accepts a non-global regex. */
+function claims(text, re) {
+  const m = re.exec(text);
+  return m ? [m[1]] : [];
+}
+
+const readme = read('README.md');
+const dataReadme = read('backend/data/README.md');
+const envExample = read('backend/.env.example');
+const dataset = JSON.parse(read('backend/data/gold-reserves.json'));
+const { config } = await import(`file://${resolve(ROOT, 'backend/src/config.js')}`);
+
+// --- Rate limits quoted in the README table must match the config -----------
+for (const [label, actual, re] of [
+  ['general', config.rateLimit.general, /general \(`\/api\/\*`\) \| (\d+)\/min/],
+  ['price history', config.rateLimit.priceHistory, /`\/api\/price\/history` \| (\d+)\/min/],
+  ['health', config.rateLimit.health, /`\/api\/health` \| (\d+)\/min/],
+]) {
+  const [quoted] = claims(readme, re);
+  if (quoted === undefined) bad(`README quotes the ${label} limit`, 'no figure found in the table');
+  else if (Number(quoted) !== actual) bad(`README ${label} limit`, `says ${quoted}, config is ${actual}`);
+  else ok(`README ${label} limit (${actual}/min)`);
+}
+
+// --- .env.example must document the same defaults the config uses -----------
+for (const [key, actual] of [
+  ['RATE_LIMIT_GENERAL', config.rateLimit.general],
+  ['RATE_LIMIT_PRICE_HISTORY', config.rateLimit.priceHistory],
+  ['RATE_LIMIT_HEALTH', config.rateLimit.health],
+  ['PORT', config.port],
+  ['CACHE_SPOT_SECONDS', config.cache.spotSeconds],
+  ['CACHE_HISTORY_SECONDS', config.cache.historySeconds],
+]) {
+  const m = new RegExp(`^${key}=(.*)$`, 'm').exec(envExample);
+  if (!m) bad(`.env.example documents ${key}`, 'absent');
+  else if (m[1].trim() !== String(actual)) bad(`.env.example ${key}`, `says ${m[1].trim()}, config is ${actual}`);
+  else ok(`.env.example ${key} (${actual})`);
+}
+
+// --- Dataset counts quoted in prose ----------------------------------------
+{
+  const [quoted] = claims(readme, /\((\d+) countries, monthly figures back to/);
+  if (Number(quoted) !== dataset.meta.countryCount) {
+    bad('README country count', `says ${quoted}, dataset has ${dataset.meta.countryCount}`);
+  } else ok(`README country count (${quoted})`);
+}
+{
+  const usa = dataset.countries.find((c) => c.countryCode === 'USA');
+  const quoted = /8,133\.5 t/.test(dataReadme);
+  if (!quoted) bad('data/README quotes the US anchor', 'the 8,133.5 t figure is gone');
+  else if (Math.abs(usa.reserveTonnes - 8133.5) > 0.1) {
+    bad('data/README US anchor', `dataset now says ${usa.reserveTonnes}`);
+  } else ok(`data/README US anchor (${usa.reserveTonnes} t)`);
+}
+
+// --- The plausibility ceiling quoted in prose ------------------------------
+{
+  const validation = JSON.parse(read('backend/data/validation.json'));
+  const [quoted] = claims(dataReadme, /`maxPlausibleTonnes` \(([\d,]+) t/);
+  const asNumber = Number(String(quoted).replace(/,/g, ''));
+  if (asNumber !== validation.maxPlausibleTonnes) {
+    bad('data/README ceiling', `says ${quoted}, validation.json is ${validation.maxPlausibleTonnes}`);
+  } else ok(`data/README ceiling (${quoted} t)`);
+}
+
+// --- Corrections named in prose must be the ones actually applied ----------
+{
+  const applied = dataset.meta.scaleCorrections.map((c) => c.countryCode).sort();
+  const named = /Currently corrected: \*\*(\w+)\*\* and \*\*(\w+)\*\*/.exec(dataReadme);
+  const inProse = named ? [named[1], named[2]].sort() : [];
+  if (inProse.join() !== applied.join()) {
+    bad('data/README lists the corrections', `prose says ${inProse.join('+') || 'none'}, data has ${applied.join('+')}`);
+  } else ok(`data/README corrections (${applied.join(', ')})`);
+}
+
+// --- No em or en dashes in authored prose ----------------------------------
+for (const [name, text] of [['README.md', readme], ['data/README.md', dataReadme]]) {
+  // Escapes, not literals: this file would otherwise trip the very check it
+  // performs, and a rule enforced by a file that breaks it is a bad rule.
+  const n = (text.match(/[\u2013\u2014]/g) ?? []).length;
+  if (n) bad(`${name} dash policy`, `${n} em/en dashes present`);
+  else ok(`${name} dash policy`);
+}
+
+// --- Live measurements, only when asked ------------------------------------
+if (process.argv.includes('--live')) {
+  const base = `http://127.0.0.1:${config.port}`;
+  const size = async (path) => (await (await fetch(base + path)).text()).length;
+  try {
+    const history = await size('/api/price/history?range=max');
+    const kB = Math.round(history / 1000);
+    const [quoted] = claims(readme, /returns \*\*(\d+) kB\*\*/);
+    // Prices are appended daily, so allow the series to grow a little.
+    if (Math.abs(Number(quoted) - kB) > 25) {
+      bad('README history payload size', `says ${quoted} kB, measured ${kB} kB`);
+    } else ok(`README history payload size (${quoted} kB, measured ${kB} kB)`);
+
+    const reserves = Math.round((await size('/api/reserves')) / 1000);
+    const [quotedR] = claims(dataReadme.concat(readme), /\/api\/reserves\s+(\d+) kB/);
+    if (quotedR && Math.abs(Number(quotedR) - reserves) > 5) {
+      bad('reserves payload size', `prose says ${quotedR} kB, measured ${reserves} kB`);
+    } else ok(`reserves payload size (measured ${reserves} kB)`);
+  } catch (err) {
+    bad('live measurements', `could not reach ${base}: ${err.message}. Start the API or drop --live.`);
+  }
+}
+
+const failed = results.filter((r) => !r.pass);
+for (const r of results) {
+  console.log(r.pass ? `  ok    ${r.what}` : `  STALE ${r.what}: ${r.detail}`);
+}
+console.log(`\n${results.length - failed.length}/${results.length} documented claims still hold.`);
+if (failed.length) {
+  console.log('Update the prose, or the config, so they agree.');
+  process.exitCode = 1;
+}

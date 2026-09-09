@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gold Tracker</title>
+    <meta
+      name="description"
+      content="Central bank gold reserves by country, valued at the current gold price."
+    />
+    <script>
+      // Applies the saved appearance before first paint. Without this the page
+      // renders light, then flips, which is worst for exactly the people the
+      // dark and hyperlegible views are for. Kept inline and tiny on purpose:
+      // an external file would be another round trip before the first frame.
+      // The keys must match THEME_KEY and FONT_KEY in src/lib/useTheme.jsx.
+      (function () {
+        try {
+          // Values are checked against the same allowlists the React side
+          // uses. Stored data is not trusted input: a stale or hand-edited key
+          // would otherwise be written straight onto the document element and
+          // leave the pre-paint state disagreeing with what React then applies.
+          var pick = function (key, allowed, fallback) {
+            var v = localStorage.getItem(key);
+            return allowed.indexOf(v) === -1 ? fallback : v;
+          };
+          var t = pick('gold-tracker:theme', ['light', 'dark', 'system'], 'system');
+          if (t === 'system') {
+            t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+          document.documentElement.dataset.theme = t;
+          document.documentElement.dataset.font = pick(
+            'gold-tracker:font', ['default', 'hyperlegible'], 'default');
+          document.documentElement.dataset.contrast = pick(
+            'gold-tracker:contrast', ['normal', 'high'], 'normal');
+        } catch (e) {
+          document.documentElement.dataset.theme = 'light';
+          document.documentElement.dataset.font = 'default';
+          document.documentElement.dataset.contrast = 'normal';
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

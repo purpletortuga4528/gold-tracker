@@ -1,0 +1,7 @@
+# Normalise to LF in the repository. Without this, every file in a Windows
+# checkout shows up as modified the moment Git touches it.
+* text=auto eol=lf
+
+# Generated snapshot: large, regenerated wholesale by `npm run build:data`.
+# Marking it so diffs stay readable rather than dumping 60k lines.
+backend/data/gold-reserves.json -diff

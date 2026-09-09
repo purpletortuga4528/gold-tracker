@@ -1,0 +1,339 @@
+@import 'tailwindcss';
+
+/* Self-hosted so the app works offline and no request leaves for a font CDN.
+   Variable weight axis 200-800, OFL-1.1. */
+@import '@fontsource-variable/atkinson-hyperlegible-next';
+
+/*
+ * Theming works through two layers.
+ *
+ * The `--c-*` custom properties below are the real palette and are the only
+ * thing that changes between light and dark. The `@theme` block maps Tailwind's
+ * colour names onto them, so a class like `bg-surface` or `text-ink/60` resolves
+ * through the palette and flips automatically. No `dark:` variants are needed
+ * anywhere in the components.
+ *
+ * There is deliberately no `prefers-color-scheme` media query here. The boot
+ * script in index.html resolves "system" to an explicit `data-theme` on <html>
+ * before first paint, and ThemeProvider keeps it in step when the OS setting
+ * changes. Doing it in one place avoids keeping a duplicated dark palette in
+ * step with a media query.
+ */
+
+:root {
+  color-scheme: light;
+
+  --c-canvas: #faf8f4;
+  --c-surface: #ffffff;
+  --c-raised: #fdf9ed;
+  --c-ink: #1a1714;
+  --c-line: #ece4d3;
+  --c-line-soft: #f5efe2;
+
+  /* Darkened from #a37814: white on that gold measured 4.00:1, under the 4.5:1
+     AA threshold, and it carries button and nav labels. This measures 5.37:1. */
+  --c-accent: #8a6412;
+  --c-accent-strong: #6b4c0d;
+  --c-accent-soft: #f8eecf;
+  --c-on-accent: #ffffff;
+
+  --c-chart-stroke: #8a6412;
+  --c-chart-fill: #c9971f;
+  --c-grid: #e8e2d6;
+  --c-axis: #6f675b;
+
+  --c-positive: #046c4e;
+  --c-negative: #b42318;
+
+  --c-warn-bg: #fffbeb;
+  --c-warn-line: #fcd9a0;
+  --c-warn-ink: #703b0a;
+
+  --c-danger-bg: #fef2f2;
+  --c-danger-line: #fbc9c9;
+  --c-danger-ink: #7a1a1a;
+
+  /* Comparison series. Distinguishable without relying on hue alone, since
+     each line is also labelled in the legend and the table beside it. */
+  --c-series-1: #8a6412;
+  --c-series-2: #1f6f6b;
+  --c-series-3: #8a3a6a;
+  --c-series-4: #2f5a8c;
+  --c-series-5: #8c4a1f;
+  --c-series-6: #3f6b2f;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* Warm near-black rather than pure black: the palette is a gold one, and a
+     neutral grey ground makes the accent read as dirty yellow. */
+  --c-canvas: #14120f;
+  --c-surface: #1c1916;
+  --c-raised: #241f19;
+  --c-ink: #f2ece2;
+  --c-line: #352f27;
+  --c-line-soft: #2a251f;
+
+  /* Lightened, because the light-mode gold fails contrast on a dark ground. */
+  --c-accent: #e6c35c;
+  --c-accent-strong: #f0cf7a;
+  --c-accent-soft: #3a2f16;
+  --c-on-accent: #1a1510;
+
+  --c-chart-stroke: #e6c35c;
+  --c-chart-fill: #c9971f;
+  --c-grid: #302a23;
+  --c-axis: #9a9184;
+
+  --c-positive: #4ade80;
+  --c-negative: #fca5a5;
+
+  --c-warn-bg: #2e2311;
+  --c-warn-line: #5c4718;
+  --c-warn-ink: #f5d99b;
+
+  --c-danger-bg: #2e1616;
+  --c-danger-line: #5c2a2a;
+  --c-danger-ink: #f6b7b7;
+
+  --c-series-1: #e6c35c;
+  --c-series-2: #5ec8c0;
+  --c-series-3: #e08ac0;
+  --c-series-4: #7fb0ea;
+  --c-series-5: #eda070;
+  --c-series-6: #9ed17f;
+}
+
+/*
+ * High contrast, applied on top of whichever theme is active rather than as a
+ * fourth theme. Needing high contrast and preferring a dark ground are separate
+ * needs; folding them together would make one give way to the other.
+ *
+ * Grounds go pure, ink goes pure, and every border becomes ink so panel edges
+ * are structural rather than a hint. The accent keeps enough colour to stay
+ * recognisable while clearing AAA against its ground.
+ */
+:root[data-contrast='high'] {
+  --c-canvas: #ffffff;
+  --c-surface: #ffffff;
+  --c-raised: #ffffff;
+  --c-ink: #000000;
+  --c-line: #000000;
+  --c-line-soft: #000000;
+
+  --c-accent: #4a3608;
+  --c-accent-strong: #3d2c06;
+  --c-accent-soft: #ffffff;
+  --c-on-accent: #ffffff;
+
+  --c-chart-stroke: #000000;
+  --c-chart-fill: #000000;
+  --c-grid: #6b6b6b;
+  --c-axis: #000000;
+
+  --c-positive: #00522f;
+  --c-negative: #8c0d0d;
+
+  --c-warn-bg: #ffffff;
+  --c-warn-line: #000000;
+  --c-warn-ink: #000000;
+
+  --c-danger-bg: #ffffff;
+  --c-danger-line: #000000;
+  --c-danger-ink: #8c0d0d;
+
+  --c-series-1: #000000;
+  --c-series-2: #00463f;
+  --c-series-3: #6b0a52;
+  --c-series-4: #0a2f6b;
+  --c-series-5: #6b2a00;
+  --c-series-6: #14400a;
+}
+
+:root[data-theme='dark'][data-contrast='high'] {
+  --c-canvas: #000000;
+  --c-surface: #000000;
+  --c-raised: #000000;
+  --c-ink: #ffffff;
+  --c-line: #ffffff;
+  --c-line-soft: #ffffff;
+
+  --c-accent: #ffd966;
+  --c-accent-strong: #ffe28f;
+  --c-accent-soft: #000000;
+  --c-on-accent: #000000;
+
+  --c-chart-stroke: #ffffff;
+  --c-chart-fill: #ffffff;
+  --c-grid: #8a8a8a;
+  --c-axis: #ffffff;
+
+  --c-positive: #7dfab4;
+  --c-negative: #ffb3b3;
+
+  --c-warn-bg: #000000;
+  --c-warn-line: #ffffff;
+  --c-warn-ink: #ffd966;
+
+  --c-danger-bg: #000000;
+  --c-danger-line: #ffffff;
+  --c-danger-ink: #ffb3b3;
+
+  --c-series-1: #ffd966;
+  --c-series-2: #7ff0e6;
+  --c-series-3: #ffa6e0;
+  --c-series-4: #a8ccff;
+  --c-series-5: #ffc08f;
+  --c-series-6: #b8f0a0;
+}
+
+@theme {
+  --color-canvas: var(--c-canvas);
+  --color-surface: var(--c-surface);
+  --color-raised: var(--c-raised);
+  --color-ink: var(--c-ink);
+  --color-line: var(--c-line);
+  --color-line-soft: var(--c-line-soft);
+
+  --color-accent: var(--c-accent);
+  --color-accent-strong: var(--c-accent-strong);
+  --color-accent-soft: var(--c-accent-soft);
+  --color-on-accent: var(--c-on-accent);
+
+  --color-positive: var(--c-positive);
+  --color-negative: var(--c-negative);
+
+  --color-warn-bg: var(--c-warn-bg);
+  --color-warn-line: var(--c-warn-line);
+  --color-warn-ink: var(--c-warn-ink);
+
+  --color-danger-bg: var(--c-danger-bg);
+  --color-danger-line: var(--c-danger-line);
+  --color-danger-ink: var(--c-danger-ink);
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+/*
+ * The Atkinson Hyperlegible Next view.
+ *
+ * Atkinson Hyperlegible Next is the 2024 second version of Atkinson
+ * Hyperlegible, credited by Google Fonts to the Braille Institute, Applied
+ * Design Works, Elliott Scott, Megan Eiswerth and Letters From Sweden. Its
+ * letterforms are drawn so that commonly confused characters stay distinct.
+ * Switching the family alone gets most of the benefit, so the extra adjustments
+ * here stay modest: a little more line height and letter spacing.
+ */
+:root[data-font='hyperlegible'] {
+  --font-sans: 'Atkinson Hyperlegible Next Variable', 'Atkinson Hyperlegible Next',
+    ui-sans-serif, system-ui, sans-serif;
+}
+
+:root[data-font='hyperlegible'] body {
+  line-height: 1.6;
+  letter-spacing: 0.005em;
+}
+
+html {
+  font-family: var(--font-sans);
+}
+
+body {
+  @apply bg-canvas text-ink antialiased;
+  font-family: var(--font-sans);
+}
+
+/* Wide content scrolls inside its own container, never the page body. */
+.table-scroll {
+  @apply overflow-x-auto;
+}
+
+/* Visible keyboard focus in both themes. Without an explicit colour the default
+   ring is nearly invisible against the dark surface. */
+:where(a, button, input, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--c-accent-strong);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/*
+ * The palette above is only half the job. Secondary text throughout the app is
+ * ink at reduced opacity (`text-ink/50` and friends), which Tailwind compiles
+ * to a color-mix against transparent. Pure black at 50 percent on white is
+ * #808080, about 3.9:1, so a high-contrast palette with faded text on top of it
+ * would still fail. These rules restore full opacity to exactly those
+ * utilities, which is the difference between a darker page and a readable one.
+ *
+ * They target generated class names, so if a new opacity step is used in a
+ * component it needs adding here. The contrast audit in the README is the check
+ * that catches it.
+ */
+:root[data-contrast='high'] :is(
+    .text-ink\/30,
+    .text-ink\/40,
+    .text-ink\/50,
+    .text-ink\/60,
+    .text-ink\/70
+  ) {
+  color: var(--c-ink);
+}
+
+:root[data-contrast='high'] :is(
+    .text-warn-ink\/70,
+    .text-warn-ink\/80,
+    .text-warn-ink\/90
+  ) {
+  color: var(--c-warn-ink);
+}
+
+:root[data-contrast='high'] :is(.text-danger-ink\/80, .text-danger-ink\/90) {
+  color: var(--c-danger-ink);
+}
+
+/*
+ * Tinted chips lose their tint against a pure ground, so give them an edge.
+ *
+ * `.bg-warn-line` has to be here too. In high contrast that token becomes ink
+ * so it can serve as a border, which turned the "unit fix" pill into black text
+ * on a black ground: a contrast ratio of exactly 1.00. Caught by auditing
+ * rendered elements rather than palette pairs, which is the only way that class
+ * of bug shows up.
+ */
+:root[data-contrast='high'] :is(
+    .bg-ink\/5,
+    .bg-ink\/10,
+    .bg-raised\/60,
+    .bg-warn-line,
+    .bg-accent-soft
+  ) {
+  background-color: transparent;
+  outline: 1px solid var(--c-ink);
+  outline-offset: -1px;
+}
+
+/* Panel and row edges carry the layout once background tints are gone. */
+:root[data-contrast='high'] :is(.border-line, .border-line-soft) {
+  border-color: var(--c-ink);
+}
+
+:root[data-contrast='high'] a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+:root[data-contrast='high'] :where(a, button, input, select, [tabindex]):focus-visible {
+  outline: 3px solid var(--c-ink);
+  outline-offset: 2px;
+}

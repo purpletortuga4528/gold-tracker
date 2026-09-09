@@ -1,0 +1,28 @@
+{
+  "name": "gold-tracker-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "API for the Gold Tracker: proxies gold price data and serves the curated central bank reserves dataset.",
+  "engines": {
+    "node": ">=20.6.0"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test",
+    "build:data": "node scripts/build-reserves.mjs --start-year 2010",
+    "verify:provider": "node scripts/verify-provider.mjs",
+    "check:freshness": "node scripts/check-freshness.mjs"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.7.0"
+  },
+  "overrides": {
+    "qs": "^6.16.0"
+  },
+  "_overridesNote": "qs is pinned above express 4.22.2 (which wants ~6.15.1) to pick up the fixes for GHSA-x5fp-wj9c-mxmx and GHSA-4mjr-xmp4-gh2g. Both are query-parsing issues reachable from any request. Drop this once express depends on qs >= 6.16.0 itself."
+}

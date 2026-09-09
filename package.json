@@ -1,0 +1,20 @@
+{
+  "name": "gold-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Central bank gold reserves by country, valued at the current gold price.",
+  "engines": {
+    "node": ">=20.6.0"
+  },
+  "scripts": {
+    "setup": "npm install --prefix backend && npm install --prefix frontend",
+    "dev": "node scripts/dev.mjs",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "build": "npm run build --prefix frontend",
+    "build:data": "npm run build:data --prefix backend",
+    "test": "npm test --prefix backend",
+    "check:docs": "node scripts/check-docs.mjs"
+  }
+}

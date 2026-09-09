@@ -1,0 +1,11 @@
+{
+  "_note": "Tunables for the ingest's data-quality checks. Unit errors in the IRFCL gold volume line are detected from the data rather than from a hand-written list: a correction runs only when the figure is impossible as filed AND a power of ten restores the reporter's own implied price to the market price of the month it filed. See data/README.md.",
+  "maxPlausibleTonnes": 9000,
+  "maxPlausibleNote": "Set just above the largest known national holding (the United States, about 8,134 t). This is the precondition for any unit correction, not merely a backstop: detectUnitScale refuses to touch a figure that is believable as filed, which is what stops a reporter carrying gold at historical cost from being 'corrected' when its book rate happens to sit near a power of ten below the market price. buildEntry then re-checks the whole corrected history against the same ceiling and quarantines anything still impossible.",
+  "scaleTolerance": 0.25,
+  "scaleToleranceNote": "How far the implied USD per ounce may sit from the gold price of the month filed and still count as a match. Measured across the 2026 filings, the median legitimate reporter is 0.6 percent off and Switzerland is 0.1 percent, but Malta reaches 21.3 percent and India 8.1 percent, which is what the width is for: a reporter's valuation date, its own exchange rate and the benchmark are never the same instant. Widening this cannot create a false correction on its own, because maxPlausibleTonnes gates that; it only changes the cosmetic valuationBasis label.",
+  "statutoryBookUsdPerOunce": 42.2222,
+  "statutoryBookNote": "The United States carries its gold at this statutory rate rather than at market. Used only by classifyValuation, which labels how a reporter values its gold for information; detectUnitScale never reads it, so a book-value match can never justify a scale correction. Only a market-price match can.",
+  "manualScaleOverrides": {},
+  "manualScaleOverridesNote": "Escape hatch, normally empty. Add {\"XXX\": {\"divisor\": 1000, \"evidence\": \"...\"}} only if automatic detection cannot resolve a country and you have a citable source. Entries here take precedence over detection."
+}

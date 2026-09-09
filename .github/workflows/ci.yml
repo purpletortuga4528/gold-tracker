@@ -243,6 +243,50 @@ jobs:
         run: npm run check:freshness --prefix backend
         continue-on-error: true
 
+  ingest:
+    name: The ingest still works against the live IMF
+    # Weekly and on demand, not on every push. The ingest is the one thing here
+    # that depends on somebody else's API being up, and a red build on every
+    # pull request because the IMF was restarting would teach people to ignore
+    # red builds. A week is well inside IRFCL's monthly publication cycle.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install
+        run: npm run setup
+
+      - name: Keep the committed snapshot to compare against
+        run: cp backend/data/gold-reserves.json committed-snapshot.json
+
+      - name: Rebuild from the IMF
+        # About four seconds against the live API. The unit tests cover the
+        # detection functions with fixtures; nothing covered the fetching,
+        # the SDMX parsing, the sector choice or the write until this.
+        run: npm run build:data
+
+      - name: The fresh snapshot is sound
+        # Fails on shapes that mean the pipeline broke: no entries, a collapsed
+        # country count, the US anchor moving, an implausible holding getting
+        # published, data going backwards. It does NOT fail because figures
+        # moved, which is the data working rather than the code breaking.
+        run: npm run check:ingest -- --before committed-snapshot.json --after backend/data/gold-reserves.json
+
+      - name: Keep the fresh snapshot
+        # So the difference can be inspected, and committed deliberately by a
+        # person rather than pushed by a workflow.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rebuilt-snapshot
+          path: backend/data/gold-reserves.json
+          retention-days: 14
+
   audit:
     name: Dependency advisories
     runs-on: ubuntu-latest

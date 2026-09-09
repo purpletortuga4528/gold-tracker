@@ -46,16 +46,23 @@ npm run build       # production frontend build
 npm run build:data  # refresh the reserves snapshot from the IMF
 npm run check:freshness --prefix backend   # is the snapshot stale? exits 0/1/2
 npm run check:docs  # do the figures quoted in these docs still match reality?
+npm run check:ingest -- --before <old.json> --after <new.json>  # did a rebuild break anything?
 ```
 
 CI runs the tests, the contrast audit, the build, the docs check, the freshness
-check and `npm audit` on every push and pull request, and again weekly, because two of
-those go stale on their own rather than when someone changes the code: the IMF
-snapshot ages, and an advisory can be published against a dependency nobody has
-touched. Coverage runs as part of the docs check, which compares it against the
-figure quoted below. `build:data` is the one command CI does not run, because it
-calls the IMF on every invocation; the freshness check is what watches the
-snapshot instead.
+check and `npm audit` on every push and pull request, and again weekly, because
+two of those go stale on their own rather than when someone changes the code:
+the IMF snapshot ages, and an advisory can be published against a dependency
+nobody has touched. Coverage runs as part of the docs check, which compares it
+against the figure quoted below.
+
+`build:data` runs weekly only, and on demand. It is the one thing here that
+depends on somebody else's API being up, and a red build on every pull request
+because the IMF was restarting would teach people to ignore red builds. A week
+sits well inside IRFCL's monthly publication cycle. The rebuilt snapshot is
+compared against the committed one by `check:ingest`, which fails on shapes
+meaning the pipeline broke, and merely reports figures that moved: a central
+bank buying gold is the data working, not a reason for a red build.
 
 ## Hosting it
 

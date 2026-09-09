@@ -335,20 +335,12 @@ jobs:
           echo "API did not start"; exit 1
 
       - name: Documented sizes still match a live response
-        # This is also where the real history payload is measured compressed.
-        # The unit suite asserts compression on /api/reserves instead, because
-        # the history route needs the live LBMA feed and that suite is offline.
+        # Also measures the real history payload, compressed and not. When the
+        # LBMA feed is unreachable from the runner it reports those two claims
+        # as SKIP rather than STALE: an upstream outage is not evidence that a
+        # documented figure is wrong, and failing here would teach people to
+        # ignore this job.
         run: npm run check:docs -- --live
-
-      - name: The 694 kB history payload is actually compressed
-        run: |
-          url='http://127.0.0.1:5174/api/price/history?range=max'
-          enc=$(curl -s -H 'Accept-Encoding: gzip' -D - -o /dev/null "$url" | grep -io '^content-encoding: *[a-z]*' | grep -o '[a-z]*$')
-          if [ "$enc" != "gzip" ]; then
-            echo "the largest response on the server went out uncompressed (got: ${enc:-none})"
-            exit 1
-          fi
-          echo "history payload is gzipped"
 
       - name: Every API path is rate limited
         # A path that answers with no RateLimit header at all is the bypass

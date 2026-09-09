@@ -37,16 +37,16 @@ installing only the backend on 20.6 and serving real data from it. Developed on
 Node 24.
 
 ```bash
-npm test            # both suites: 77 backend, 151 frontend
+npm test              # both suites: 77 backend, 151 frontend
 npm run test:backend
 npm run test:frontend
 npm run test:coverage
-npm run test:contrast  # contrast of every rendered element, in a real browser
-npm run build       # production frontend build
-npm run build:data  # refresh the reserves snapshot from the IMF
+npm run test:contrast # every rendered element, in a real browser, in four modes
+npm run build         # production frontend build
+npm run build:data    # refresh the reserves snapshot from the IMF
+npm run check:docs    # do the figures quoted in these docs still match reality?
+npm run check:ingest  # did a rebuild break the dataset? (see the script for its two arguments)
 npm run check:freshness --prefix backend   # is the snapshot stale? exits 0/1/2
-npm run check:docs  # do the figures quoted in these docs still match reality?
-npm run check:ingest -- --before <old.json> --after <new.json>  # did a rebuild break anything?
 ```
 
 CI runs the tests, the contrast audit, the build, the docs check, the freshness

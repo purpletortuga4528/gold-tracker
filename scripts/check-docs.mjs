@@ -31,8 +31,18 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => readFileSync(resolve(ROOT, rel), 'utf8');
 
 const results = [];
-const ok = (what) => results.push({ pass: true, what });
-const bad = (what, detail) => results.push({ pass: false, what, detail });
+const ok = (what) => results.push({ state: 'ok', what });
+const bad = (what, detail) => results.push({ state: 'stale', what, detail });
+/**
+ * Could not check, and says why.
+ *
+ * Distinct from both other outcomes on purpose. "The LBMA feed is unreachable
+ * from this runner" is not evidence that a documented figure is wrong, and
+ * reporting it as stale sends someone to edit prose that was correct. It is
+ * not a pass either: the claim went unverified, and the run should say so
+ * rather than counting it as checked.
+ */
+const skip = (what, detail) => results.push({ state: 'skip', what, detail });
 
 /** First capture group of `re` in `text`, or undefined. Accepts a non-global regex. */
 function claims(text, re) {
@@ -240,16 +250,35 @@ if (process.argv.includes('--counts')) {
 if (process.argv.includes('--live')) {
   const base = `http://127.0.0.1:${config.port}`;
   const size = async (path) => (await (await fetch(base + path)).text()).length;
+
+  /**
+   * Whether a route can be measured at all right now.
+   *
+   * The history route is served from the live LBMA feed, and that feed is not
+   * reliably reachable from a CI runner. When it is down the API answers 502
+   * with a short body, which reads exactly like a documented 694 kB figure
+   * having gone stale. It is not: it is a claim that could not be checked,
+   * and saying so is the only honest reading of it.
+   */
+  const measurable = async (path) => {
+    const res = await fetch(base + path);
+    if (res.ok) return { ok: true };
+    const body = await res.text();
+    return { ok: false, why: `the API answered ${res.status}: ${body.slice(0, 120)}` };
+  };
   try {
     // A claim this cannot find is a FAILURE, not a pass. The first version
     // compared `Number(undefined)`, and NaN fails every comparison, so
     // rewording the sentence around the figure turned the check green while it
     // was reading nothing at all. A checker that reports "ok" for a claim it
     // could not locate is worse than no checker.
-    const history = await size('/api/price/history?range=max');
+    const historyAvailable = await measurable('/api/price/history?range=max');
+    const history = historyAvailable.ok ? await size('/api/price/history?range=max') : 0;
     const kB = Math.round(history / 1000);
     const [quoted] = claims(readme, /is \*\*(\d+) kB\*\* for a \d+ byte request/);
-    if (quoted === undefined) {
+    if (!historyAvailable.ok) {
+      skip('README history payload size', `${historyAvailable.why}. LBMA is upstream of this route, so this says nothing about the documented figure.`);
+    } else if (quoted === undefined) {
       bad('README history payload size', 'no figure found; has the sentence been reworded?');
     } else if (Math.abs(Number(quoted) - kB) > 25) {
       // Prices are appended daily, so allow the series to grow a little.
@@ -291,6 +320,10 @@ if (process.argv.includes('--live')) {
         bad(`rateLimit.js quotes the ${label} size`, 'the table row could not be read');
         continue;
       }
+      if (label === 'history' && !historyAvailable.ok) {
+        skip(`rateLimit.js ${label} size`, historyAvailable.why);
+        continue;
+      }
       const plain = Math.round((await size(path.replace('\?', '?'))) / 1000);
       if (Math.abs(Number(m[1]) - plain) > tolerance) {
         bad(`rateLimit.js ${label} size`, `says ${m[1]} kB, measured ${plain} kB`);
@@ -308,11 +341,18 @@ if (process.argv.includes('--live')) {
   }
 }
 
-const failed = results.filter((r) => !r.pass);
+const failed = results.filter((r) => r.state === 'stale');
+const skipped = results.filter((r) => r.state === 'skip');
+const checked = results.filter((r) => r.state === 'ok');
+const LABEL = { ok: '  ok   ', stale: '  STALE', skip: '  SKIP ' };
 for (const r of results) {
-  console.log(r.pass ? `  ok    ${r.what}` : `  STALE ${r.what}: ${r.detail}`);
+  console.log(r.detail ? `${LABEL[r.state]} ${r.what}: ${r.detail}` : `${LABEL[r.state]} ${r.what}`);
 }
-console.log(`\n${results.length - failed.length}/${results.length} documented claims still hold.`);
+console.log(`
+${checked.length}/${checked.length + failed.length} documented claims still hold.`);
+if (skipped.length) {
+  console.log(`${skipped.length} could not be checked on this run, listed above as SKIP.`);
+}
 if (failed.length) {
   console.log('Update the prose, or the config, so they agree.');
   process.exitCode = 1;

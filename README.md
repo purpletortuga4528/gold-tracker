@@ -37,7 +37,7 @@ installing only the backend on 20.6 and serving real data from it. Developed on
 Node 24.
 
 ```bash
-npm test            # both suites: 75 backend, 146 frontend
+npm test            # both suites: 75 backend, 151 frontend
 npm run test:backend
 npm run test:frontend
 npm run test:coverage
@@ -302,7 +302,7 @@ straight out of `index.css` and composited in Node, so
 ground it can land on, including the tinted chips, in all four modes. No
 browser, no CSS engine, and it runs in CI with the rest of the suite.
 
-**The tests cover behaviour, not lines.** 221 of them: 75 backend, 146 frontend.
+**The tests cover behaviour, not lines.** 226 of them: 75 backend, 151 frontend.
 The frontend suite covers 86 percent of statements with `coverage.all` enabled,
 so untested files count as zero rather than being left out of the report. What
 is deliberately not covered is `App.jsx`, `Dashboard.jsx` and `PriceChart.jsx`:

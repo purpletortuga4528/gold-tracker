@@ -129,7 +129,7 @@ export function useChartColors() {
       stroke: read('--c-chart-stroke', '#8a6412'),
       fill: read('--c-chart-fill', '#c9971f'),
       grid: read('--c-grid', '#e8e2d6'),
-      axis: read('--c-axis', '#7d7568'),
+      axis: read('--c-axis', '#6f675b'),
       surface: read('--c-surface', '#ffffff'),
       line: read('--c-line', '#ece4d3'),
       ink: read('--c-ink', '#1a1714'),

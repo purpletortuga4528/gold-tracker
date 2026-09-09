@@ -132,6 +132,15 @@ describe('palette contrast', () => {
       }
     });
 
+    // Recharts draws the axis labels as SVG text, so they are text like any
+    // other and are held to the same bar. They are easy to forget because they
+    // never appear in the DOM as a styled element.
+    test('chart axis labels clear the bar', () => {
+      for (const key of ['--c-canvas', '--c-surface', '--c-raised']) {
+        expect(ratio(t['--c-axis'], t[key]), `axis on ${key}`).toBeGreaterThanOrEqual(bar);
+      }
+    });
+
     // These two are still opacity steps in the components, so they are checked
     // composited rather than flat. If a component adds a step outside this
     // list, this test will not know: keep the list in step with index.css.
@@ -149,5 +158,25 @@ describe('palette contrast', () => {
         ).toBeGreaterThanOrEqual(bar);
       }
     });
+  });
+});
+
+/**
+ * Recharts takes colours as props, so useChartColors reads the custom
+ * properties back out of the computed style, with a hardcoded fallback for the
+ * case where there is no stylesheet. A fallback that has drifted from the
+ * palette is the second set of hex codes that file exists to prevent.
+ */
+describe('chart colour fallbacks', () => {
+  const source = readFileSync(resolve(process.cwd(), 'src/lib/useTheme.jsx'), 'utf8');
+
+  test('every fallback matches the light palette it stands in for', () => {
+    const pairs = [...source.matchAll(/read\('(--c-[\w-]+)',\s*'(#[0-9a-fA-F]{3,8})'\)/g)];
+    expect(pairs.length, 'no read(name, fallback) pairs found in useTheme.jsx').toBeGreaterThan(4);
+
+    for (const [, token, fallback] of pairs) {
+      expect(LIGHT[token], `${token} is read but not defined in :root`).toBeDefined();
+      expect(fallback.toLowerCase(), `fallback for ${token}`).toBe(LIGHT[token].toLowerCase());
+    }
   });
 });

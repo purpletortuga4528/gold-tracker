@@ -1,0 +1,25 @@
+# Minimal by design: one service, one port, no database, no reverse proxy.
+services:
+  gold-tracker:
+    build: .
+    ports:
+      # Host:container. Change the left side to move it off 5174.
+      - "5174:5174"
+    environment:
+      # The snapshot rebuilds itself from the IMF while the container runs, so
+      # a long-lived container does not drift. See backend/.env.example.
+      AUTO_REFRESH: "true"
+      AUTO_REFRESH_INTERVAL_HOURS: "6"
+
+      # Set this ONLY if a reverse proxy you control is in front. Left unset,
+      # every client is counted as one and the rate limits act as a single
+      # global cap rather than a per-client one.
+      # TRUST_PROXY: "1"
+    volumes:
+      # Keeps the refreshed snapshot across container rebuilds. Without it each
+      # rebuild starts from the snapshot baked into the image and re-fetches.
+      - gold-tracker-data:/app/backend/data
+    restart: unless-stopped
+
+volumes:
+  gold-tracker-data:

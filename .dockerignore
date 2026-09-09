@@ -1,0 +1,21 @@
+# Dependencies and build output are produced inside the image, never copied in.
+node_modules
+**/node_modules
+frontend/dist
+frontend/coverage
+
+# Never copy secrets or local state into an image layer.
+.env
+**/.env
+*.log
+
+# Not needed at runtime, and each one is another thing to invalidate the cache.
+.git
+.github
+.gitignore
+.gitattributes
+**/*.test.js
+**/*.test.jsx
+backend/test
+frontend/src/test
+scripts/check-docs.mjs

@@ -1,0 +1,61 @@
+# systemd unit for running Gold Tracker without Docker.
+#
+#   sudo cp deploy/gold-tracker.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now gold-tracker
+#
+# Edit User, WorkingDirectory and ExecStart to match where you cloned it.
+# Build once first: npm run setup && npm run build
+
+[Unit]
+Description=Gold Tracker: central bank gold reserves, valued at the current price
+Documentation=https://github.com/purpletortuga4528/gold-tracker
+# Wants= rather than Requires=: the app starts fine without a network and
+# serves the snapshot it already has. Only the refresh needs to reach the IMF.
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+
+# Run as an unprivileged user that owns the checkout. Never root: this process
+# fetches from the internet and writes files.
+User=gold-tracker
+Group=gold-tracker
+WorkingDirectory=/opt/gold-tracker
+
+Environment=NODE_ENV=production
+Environment=PORT=5174
+Environment=SERVE_FRONTEND=true
+# The snapshot rebuilds itself, so no cron entry is needed. See
+# backend/.env.example for the interval settings.
+Environment=AUTO_REFRESH=true
+
+# Node directly, not npm: npm swallows signals, so systemctl stop would wait
+# out its timeout and then kill the process rather than shutting it down.
+ExecStart=/usr/bin/node backend/src/index.js
+
+# The app handles SIGTERM and closes the listener, so in-flight requests finish.
+KillSignal=SIGTERM
+TimeoutStopSec=15
+
+Restart=on-failure
+RestartSec=5
+
+# Hardening. The process needs to read its checkout and write exactly one
+# directory, the one holding the refreshed snapshot.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/gold-tracker/backend/data
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+
+[Install]
+WantedBy=multi-user.target

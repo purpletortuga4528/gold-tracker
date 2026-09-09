@@ -52,6 +52,41 @@ two of them go stale on their own rather than when someone changes the code:
 the IMF snapshot ages, and an advisory can be published against a dependency
 nobody has touched.
 
+## Hosting it
+
+Three ways, in order of how little you have to think about.
+
+**Docker.** One service, one port, no database and no reverse proxy:
+
+```bash
+docker compose up -d
+```
+
+The image is two stages, so no build tooling reaches the running container. It
+runs as a non-root user, writes only the directory holding the snapshot, and
+its healthcheck reports unhealthy when the data goes stale as well as when the
+process is down, because a container serving three month old figures is not
+healthy in any sense that matters. A named volume keeps the refreshed snapshot
+across rebuilds.
+
+**systemd**, if you would rather not use Docker. A unit is in
+[deploy/gold-tracker.service](deploy/gold-tracker.service), with the hardening
+options set and `ReadWritePaths` limited to the one directory the app writes.
+Build once with `npm run setup && npm run build`, then enable it.
+
+**Directly**, which is fine for a machine you are sitting at:
+
+```bash
+npm start
+```
+
+All three stop cleanly. The app handles `SIGTERM` by closing the listener and
+letting in-flight requests finish, so `docker stop` and `systemctl stop` take
+well under a second instead of waiting out a timeout and killing the process.
+
+You do not need a cron entry for the data. The snapshot refreshes itself while
+the server runs.
+
 ## Where the data comes from
 
 ### Reserves: IMF IRFCL

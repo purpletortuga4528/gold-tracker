@@ -31,7 +31,7 @@ const app = createApp();
 
 if (config.autoRefresh.enabled) startAutoRefresh();
 
-app.listen(config.port, () => {
+const server = app.listen(config.port, () => {
   const active = listProviders().find((p) => p.active);
   console.log(`Gold Tracker API listening on http://localhost:${config.port}`);
   console.log(`  price provider: ${active ? active.label : config.priceProvider}`);
@@ -65,3 +65,40 @@ app.listen(config.port, () => {
     console.log('    proxy you control is genuinely in front; otherwise limits are bypassable.');
   }
 });
+
+/*
+ * Shut down on a signal rather than being killed.
+ *
+ * A container restarts often, and without this every restart severs whatever
+ * requests were in flight. `docker stop` sends SIGTERM and waits ten seconds
+ * before killing, so closing the listener and letting open requests finish
+ * costs nothing and avoids truncated responses.
+ *
+ * The forced exit is the backstop: a connection that never closes must not
+ * hold the process past the grace period, or the shutdown becomes the kill it
+ * was meant to replace.
+ */
+let shuttingDown = false;
+for (const signal of ['SIGTERM', 'SIGINT']) {
+  process.on(signal, () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`
+${signal} received, finishing in-flight requests`);
+
+    const forced = setTimeout(() => {
+      console.error('shutdown timed out, exiting anyway');
+      process.exit(1);
+    }, 8000);
+    forced.unref();
+
+    server.close((err) => {
+      if (err) {
+        console.error('error while closing:', err);
+        process.exit(1);
+      }
+      console.log('stopped cleanly');
+      process.exit(0);
+    });
+  });
+}

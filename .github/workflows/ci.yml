@@ -128,6 +128,53 @@ jobs:
           echo "$app" | grep -qE "https?://" && { echo "app CSP allows an external origin"; exit 1; }
           echo ok
 
+  container:
+    # The Dockerfile is a deployment claim, so it gets built and run rather
+    # than assumed to work.
+    name: Container builds and serves
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the image
+        run: docker build -t gold-tracker:ci .
+
+      - name: Run it
+        run: |
+          docker run -d --name gt -p 5174:5174 gold-tracker:ci
+          for i in $(seq 1 60); do
+            curl -sf -o /dev/null http://127.0.0.1:5174/api/health && break
+            sleep 1
+          done
+          curl -sf -o /dev/null http://127.0.0.1:5174/api/health || { docker logs gt; exit 1; }
+
+      - name: Serves the app and the API
+        run: |
+          curl -sf http://127.0.0.1:5174/ | grep -q 'id="root"'
+          curl -sf 'http://127.0.0.1:5174/api/reserves?limit=1' | grep -q '"countryCode":"USA"'
+
+      - name: Runs as a non-root user
+        run: |
+          uid=$(docker exec gt id -u)
+          [ "$uid" != "0" ] || { echo "container runs as root"; exit 1; }
+          echo "uid ${uid}"
+
+      - name: Build tooling is not in the runtime image
+        run: |
+          for path in /app/frontend/node_modules /app/backend/test /app/.git; do
+            docker exec gt sh -c "test -e ${path}" && { echo "${path} present"; exit 1; }
+          done
+          echo ok
+
+      - name: Stops cleanly rather than being killed
+        run: |
+          start=$(date +%s%N)
+          docker stop gt > /dev/null
+          elapsed=$(( ($(date +%s%N) - start) / 1000000 ))
+          echo "stopped in ${elapsed}ms"
+          [ "$elapsed" -lt 5000 ] || { echo "took too long; signals may not be reaching node"; exit 1; }
+          docker logs gt 2>&1 | grep -q "stopped cleanly"
+
   checks:
     name: Data and docs
     runs-on: ubuntu-latest

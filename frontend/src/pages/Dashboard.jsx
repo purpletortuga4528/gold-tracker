@@ -19,6 +19,11 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
+      {/* No visible page title here: the page opens with the price itself, and
+          the site name in the header carries the identity. A level-one heading
+          is still needed for anyone navigating by headings. */}
+      <h1 className="sr-only">Gold price and the largest official holdings</h1>
+
       <Card>
         <PriceHeadline />
       </Card>

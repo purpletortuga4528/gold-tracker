@@ -57,7 +57,14 @@ export function ReservesTable({ countries, selectable, selected, onToggle }) {
       <table className="w-full min-w-[58rem] border-collapse text-sm">
         <thead>
           <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-ink-muted">
-            {selectable && <th className="w-8 px-2 py-2" />}
+            {/* Holds the selection checkboxes. An empty header cell leaves the
+                column unnamed in a screen reader's table summary, so it is
+                named here and hidden visually. */}
+            {selectable && (
+              <th className="w-8 px-2 py-2">
+                <span className="sr-only">Select for comparison</span>
+              </th>
+            )}
             {COLUMNS.map((col) => (
               <th
                 key={col.key}

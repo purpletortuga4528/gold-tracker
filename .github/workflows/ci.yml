@@ -180,8 +180,8 @@ jobs:
           [ "$elapsed" -lt 5000 ] || { echo "took too long; signals may not be reaching node"; exit 1; }
           docker logs gt 2>&1 | grep -q "stopped cleanly"
 
-  contrast:
-    name: Contrast on a rendered page
+  browser:
+    name: Accessibility in a real browser
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -199,19 +199,19 @@ jobs:
         run: npx playwright install --with-deps chromium
         working-directory: frontend
 
-      - name: Measure every rendered element in all four modes
-        # The palette is checked without a browser in the unit suite. This is
-        # the other half: what a component actually renders, including a
-        # background token colliding with a text token, which no palette
-        # pairing can reveal. It fails on any colour its parser cannot read,
-        # because a silent skip is how the published figures came to be wrong.
-        run: npm run test:contrast
+      - name: Contrast, axe, and the keyboard, in all four appearance modes
+        # Three things a browser is needed for. Contrast of every rendered
+        # element, which the palette test cannot see because it cannot know
+        # what a component actually renders. axe, for the structural rules.
+        # And driving the keyboard, because nothing else answers whether the
+        # thing can be used without a mouse.
+        run: npm run test:browser
 
       - name: Keep the failure evidence
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: contrast-failure
+          name: browser-failure
           path: frontend/test-results/
           retention-days: 7
 

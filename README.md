@@ -41,7 +41,7 @@ npm test              # both suites: 77 backend, 151 frontend
 npm run test:backend
 npm run test:frontend
 npm run test:coverage
-npm run test:contrast # every rendered element, in a real browser, in four modes
+npm run test:browser  # contrast, axe and the keyboard, in a browser, four modes
 npm run build         # production frontend build
 npm run build:data    # refresh the reserves snapshot from the IMF
 npm run check:docs    # do the figures quoted in these docs still match reality?
@@ -325,7 +325,7 @@ sufficient alone, and both run in CI.
 composites every text token against every ground it can land on. No browser, so
 it runs with the rest of the unit suite in about a second.
 
-`npm run test:contrast` is the other half: Playwright loads the built app, in
+`npm run test:browser` is the other half: Playwright loads the built app, in
 all four modes, and walks every rendered text element computing the real ratio
 against its resolved background. That is the only thing that catches a colour a
 component invented for itself, or a background token colliding with a text
@@ -334,13 +334,13 @@ every row; the element count is lower on other pages:
 
 | Mode | Bar | Worst measured | Failing |
 |---|---|---|---|
-| light / normal | AA 4.5 | 5.37 | 0 of 638 |
-| light / high | AAA 7.0 | 11.52 | 0 of 638 |
-| dark / normal | AA 4.5 | 6.45 | 0 of 638 |
-| dark / high | AAA 7.0 | 15.37 | 0 of 638 |
+| light / normal | AA 4.5 | 5.37 | 0 of 640 |
+| light / high | AAA 7.0 | 11.52 | 0 of 640 |
+| dark / normal | AA 4.5 | 6.45 | 0 of 640 |
+| dark / high | AAA 7.0 | 15.37 | 0 of 640 |
 
 An element counts if it has a direct non-empty text node, is visible, and has a
-non-zero box. Those four rows are printed by `npm run test:contrast`, so this
+non-zero box. Those four rows are printed by `npm run test:browser`, so this
 table is one command to re-derive rather than a number somebody remembers.
 
 Three real defects came out of running it, and the third is the one worth
@@ -353,8 +353,8 @@ The third was the audit itself. Its colour parser matched `rgb()` and `rgba()`,
 and Chrome reports Tailwind's `color-mix` opacity utilities as `oklab(...)`, so
 every faded element was skipped without a word. That is precisely the set of
 elements at risk. Every row of the table above used to read "0 of 622"; in fact
-187 of 638 elements sat below AA in light normal and 86 in dark normal, the rank
-column at 2.52:1. The two high-contrast rows happened to be right, because high
+187 of the 638 elements the page carried then were below AA in light normal, and
+86 in dark normal, the rank column at 2.52:1. The two high-contrast rows happened to be right, because high
 contrast restored those elements to full opacity and left nothing for the parser
 to miss, which is what made the gap look like a passing result rather than a
 blind spot. The check reported the worst element it could parse and called it
@@ -415,6 +415,31 @@ to revisit before the feature ships.
 
 If the app has not been built, the API says so on a plain page pointing at
 `npm run build`, rather than serving a broken page or a bare 404.
+
+**Colour is the half of accessibility that is easy to measure.** The other half
+had never been checked at all, which is a lopsided place to stop for an app that
+ships a hyperlegible typeface and a high-contrast mode. `npm run test:browser`
+now runs axe over all four pages in all four appearance modes, and drives the
+keyboard.
+
+It found two things on its first run. Three of the four pages had no level-one
+heading, because what looks like each page's heading is a card title and `Card`
+renders `h2`. Somebody navigating by headings arrived at a page with nothing to
+orient by. `Card` now takes a `titleAs`, the page that leads with a titled card
+passes `h1`, and the dashboard, which opens with a price rather than a title,
+carries a visually hidden one. Two table columns also had empty header cells, so
+the selection and remove columns were unnamed in a table summary.
+
+A skip link came out of it as well, which axe does not flag because it is not a
+rule. Without one a keyboard user re-walks the navigation and the three
+appearance toggles on every route change, which on a four page app is most of
+the tab presses they will ever make here.
+
+What none of that does is establish that the app is accessible. These rules
+catch a fraction of what matters, and nothing here substitutes for someone using
+a screen reader in earnest. What it does is stop the fraction it covers from
+regressing quietly, which is why everything else in this file is checked rather
+than remembered.
 
 **Charts step, they do not curve.** Reserve figures are month-end reports. A
 smooth line would imply a central bank's holding drifts continuously between

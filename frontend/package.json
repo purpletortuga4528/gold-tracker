@@ -11,7 +11,7 @@
     "test:coverage": "vitest run --coverage",
     "build": "vite build",
     "preview": "vite preview",
-    "test:contrast": "playwright test"
+    "test:browser": "playwright test"
   },
   "dependencies": {
     "@fontsource-variable/atkinson-hyperlegible-next": "^5.3.0",
@@ -21,6 +21,7 @@
     "recharts": "^2.13.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.0.0",
     "@testing-library/jest-dom": "^7.0.1",

@@ -19,6 +19,16 @@ export default function App() {
     <AppearanceProvider>
       <PriceProvider>
         <div className="min-h-screen">
+          {/* Hidden until focused, which is the whole point: the first Tab on
+              any page offers a way past the navigation rather than making
+              somebody walk it again on every route change. */}
+          <a
+            href="#main"
+            className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-accent focus:px-4 focus:py-2 focus:text-on-accent"
+          >
+            Skip to content
+          </a>
+
           <header className="border-b border-line bg-surface">
             <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4">
               <div className="flex items-baseline gap-3">
@@ -51,7 +61,7 @@ export default function App() {
             </div>
           </header>
 
-          <main className="mx-auto max-w-6xl space-y-6 px-4 py-6">
+          <main id="main" className="mx-auto max-w-6xl space-y-6 px-4 py-6">
             <FreshnessBanner />
             <Routes>
               <Route path="/" element={<Dashboard />} />

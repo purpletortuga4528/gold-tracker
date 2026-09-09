@@ -1,4 +1,11 @@
-export function Card({ title, subtitle, right, children, className = '' }) {
+/**
+ * @param {object} props
+ * @param {'h1'|'h2'|'h3'} [props.titleAs] Heading level for `title`. Defaults to
+ *   h2, because most cards sit under a page heading. The card that leads a page
+ *   passes h1: a page with no level-one heading gives a screen reader nothing to
+ *   orient by, and three of these four pages had none.
+ */
+export function Card({ title, subtitle, right, children, className = '', titleAs: Heading = 'h2' }) {
   return (
     <section
       className={`rounded-xl border border-line bg-surface p-5 shadow-sm ${className}`}
@@ -6,7 +13,7 @@ export function Card({ title, subtitle, right, children, className = '' }) {
       {(title || right) && (
         <header className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
           <div>
-            {title && <h2 className="text-lg font-semibold tracking-tight">{title}</h2>}
+            {title && <Heading className="text-lg font-semibold tracking-tight">{title}</Heading>}
             {subtitle && <p className="mt-0.5 text-sm text-ink-muted">{subtitle}</p>}
           </div>
           {right}

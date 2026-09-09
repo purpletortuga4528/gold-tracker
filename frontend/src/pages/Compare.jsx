@@ -90,6 +90,7 @@ export function Compare() {
   return (
     <div className="space-y-6">
       <Card
+        titleAs="h1"
         title="Compare"
         subtitle="Put reporting economies side by side"
         right={
@@ -162,7 +163,9 @@ export function Compare() {
                   <th className="px-3 py-2 text-right font-medium">Value now</th>
                   <th className="px-3 py-2 text-right font-medium">Change over history</th>
                   <th className="px-3 py-2 font-medium">As of</th>
-                  <th className="px-3 py-2" />
+                  <th className="px-3 py-2">
+                    <span className="sr-only">Remove from comparison</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>

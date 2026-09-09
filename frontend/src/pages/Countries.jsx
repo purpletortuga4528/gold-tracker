@@ -34,6 +34,7 @@ export function Countries() {
   return (
     <div className="space-y-6">
       <Card
+        titleAs="h1"
         title="Reporting economies"
         subtitle={
           list.data ? `${list.data.total} of ${meta.data?.entryCount ?? '--'} rows shown` : undefined

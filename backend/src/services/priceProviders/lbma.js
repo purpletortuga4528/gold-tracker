@@ -9,7 +9,7 @@
  * and "PM" fixes), so `getSpot()` returns the most recent published benchmark,
  * which can be several hours to a day old. Everything this provider returns is
  * tagged `kind: "benchmark"` so the UI can say so rather than implying a tick.
- * If you need intraday spot, set PRICE_PROVIDER to a keyed provider.
+ * If you need intraday spot, add a provider: see README.md in this directory.
  *
  * Verified working against the live endpoint on 2026-09-08.
  */

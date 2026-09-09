@@ -4,9 +4,11 @@
  * what the adapter extracted from it, so you can confirm the field mapping
  * before trusting the number on a dashboard.
  *
- * Usage: npm run verify:provider -- goldapi
- *        npm run verify:provider -- metalprice
- *        npm run verify:provider -- lbma
+ * Usage: npm run verify:provider -- lbma
+ *        npm run verify:provider -- <id of any provider you register>
+ *
+ * Only lbma ships today. This exists for the second one: see
+ * src/services/priceProviders/README.md.
  */
 import { getProvider } from '../src/services/priceProviders/index.js';
 

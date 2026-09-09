@@ -49,7 +49,7 @@ describe('what the headline claims', () => {
     expect(screen.queryByText(/^Spot$/)).toBeNull();
   });
 
-  test('labels a keyed provider as spot when it genuinely is', async () => {
+  test('labels a provider as spot when it genuinely is', async () => {
     api.currentPrice.mockResolvedValue({ ...LBMA, kind: 'spot', benchmark: undefined, note: undefined });
     show();
     await waitFor(() => expect(screen.getByText('Spot')).toBeInTheDocument());

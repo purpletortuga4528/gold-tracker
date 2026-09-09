@@ -1,11 +1,18 @@
 import { config } from '../../config.js';
 import { lbmaProvider } from './lbma.js';
-import { createGoldApiProvider, createMetalPriceProvider } from './keyed.js';
 
+/*
+ * One provider ships, and it is one that has actually been run.
+ *
+ * Adapters for GoldAPI.io and MetalpriceAPI used to sit beside this. They were
+ * written from published documentation and never executed, because that needs
+ * an account, and they were labelled unverified everywhere they surfaced. The
+ * labelling was honest but the code was still untested, so it was removed
+ * rather than released. README.md in this directory documents the interface and
+ * what those adapters got wrong, so adding one remains a small job.
+ */
 const registry = new Map();
 registry.set('lbma', () => lbmaProvider);
-registry.set('goldapi', () => createGoldApiProvider({ apiKey: config.goldApiKey }));
-registry.set('metalprice', () => createMetalPriceProvider({ apiKey: config.metalPriceApiKey }));
 
 export function getProvider(id = config.priceProvider) {
   const factory = registry.get(id);
@@ -18,9 +25,11 @@ export function getProvider(id = config.priceProvider) {
 }
 
 /**
- * The provider used for historical series. Keyed providers meter history calls
- * per date, so charts always come from LBMA unless the selected provider both
- * supports history and is explicitly chosen for it.
+ * The provider used for historical series.
+ *
+ * A metered provider bills one call per day of history, and the chart asks for
+ * years, so any provider that does not declare supportsHistory falls back to
+ * LBMA, which is free and goes back to 1968.
  */
 export function getHistoryProvider() {
   const selected = getProvider();

@@ -37,12 +37,6 @@ export const config = {
    */
   priceProvider: process.env.PRICE_PROVIDER ?? 'lbma',
 
-  /**
-   * Provider keys. These stay on the server: the frontend never sees them and
-   * never talks to a price provider directly.
-   */
-  goldApiKey: process.env.GOLDAPI_KEY ?? '',
-  metalPriceApiKey: process.env.METALPRICEAPI_KEY ?? '',
 
   /** Cache lifetimes in seconds. */
   cache: {

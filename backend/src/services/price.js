@@ -27,8 +27,9 @@ export async function getSpotPrice() {
         staleReason: 'The latest refresh from the price provider failed',
       };
     }
-    // The provider's own message can carry the request URL and, for a keyed
-    // provider, query parameters. Log it, return something safe.
+    // The provider's own message can carry the request URL, and for any
+    // provider that authenticates, whatever the key is passed in. Log it,
+    // return something safe.
     console.error(`[price] ${provider.id} spot fetch failed:`, err);
     throw new HttpError(502, 'Could not reach the gold price provider');
   }

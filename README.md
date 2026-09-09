@@ -134,23 +134,22 @@ It is **not a live spot feed**. The auction runs twice a day, so the price you
 see is the most recent published fix, tagged with its date. The app says
 "daily benchmark", not "live", because it is one and not the other.
 
-If you want intraday spot, adapters for GoldAPI.io and MetalpriceAPI are in
-`backend/src/services/priceProviders/keyed.js`. Set `PRICE_PROVIDER` and the
-matching key in `backend/.env` (copy `.env.example`).
+If you want intraday spot, the LBMA feed will not give it to you: add a
+provider. `backend/src/services/priceProviders/README.md` documents the
+interface, which is one required method.
 
-> **Those two adapters are unverified.** They were written from published
-> documentation and never exercised against a live account, because that needs
-> an account and a key, which this project deliberately does not require. Field
-> names move. Before trusting one:
->
-> ```bash
-> npm run verify:provider --prefix backend -- goldapi
-> ```
->
-> That makes one real call and prints the raw response beside what the adapter
-> extracted, so you can see whether the mapping holds. The adapters throw a loud
-> error naming the keys they actually received rather than returning a wrong
-> number quietly.
+Adapters for GoldAPI.io and MetalpriceAPI used to ship here. They were written
+from published documentation and never executed, because running them needs an
+account, and they were labelled unverified in the code, in the API response and
+in this file. That labelling was accurate, but a release should not carry code
+nobody has ever run, so they were removed and replaced with a document that
+records the interface and the traps: unit conversions that produce a
+plausible-looking wrong number, fallback fields that mean something else, and
+per-date history endpoints that bill one call per day of chart.
+
+`npm run verify:provider -- <id>` makes one real call and prints the raw
+response beside what the adapter extracted, so a new one can be checked before
+it is trusted.
 
 Keys stay server side. The frontend never calls a provider and never sees a key.
 
@@ -177,7 +176,7 @@ gold-tracker/
     src/
       routes/            price and reserves HTTP routes
       services/
-        priceProviders/  lbma.js (default, verified) and keyed.js (unverified)
+        priceProviders/  lbma.js, plus README.md on adding a second
         price.js         provider selection, caching, stale fallback
         reserves.js      dataset loading, search and filtering
       lib/

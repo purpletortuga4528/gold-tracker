@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generatedAt": "2026-09-08T21:21:57.203Z",
+    "generatedAt": "2026-09-09T16:32:12.804Z",
     "source": "International Monetary Fund, International Reserves and Foreign Currency Liquidity (IRFCL)",
     "sourceUrl": "https://data.imf.org/en/datasets/IMF.STA:IRFCL",
     "apiQueries": {
@@ -15,9 +15,9 @@
     },
     "unitDetection": {
       "method": "Each reporter's own USD figure divided by its own ounce figure gives an implied price per ounce, compared against the LBMA fix for the same month. A match at market or at the US statutory rate accepts the ounces as reported; a match only after dividing by a power of ten identifies a unit error.",
-      "referenceSeries": "LBMA Gold Price PM, 14677 daily fixes",
-      "latestReferencePriceUsdPerOunce": 4402.55,
-      "latestReferenceAsOfDate": "2026-09-07"
+      "referenceSeries": "LBMA Gold Price PM, 14678 daily fixes",
+      "latestReferencePriceUsdPerOunce": 4399.1,
+      "latestReferenceAsOfDate": "2026-09-08"
     },
     "indicatorNote": "Gold (including gold deposits and, if appropriate, gold swapped), reported as volume in fine troy ounces and converted to tonnes at 31.1034768 g per troy ounce.",
     "valuationNote": "Tonnes only. Every USD figure in this app is computed as tonnes x market price. The IMF USD columns are used to detect unit errors and to derive non-gold reserves, never to value gold: reporters carry gold at inconsistent valuations, the US at the statutory $42.2222/oz.",
@@ -44161,12 +44161,12 @@
       "kind": "country",
       "region": "Asia",
       "reserveTonnes": 7.83,
-      "asOfDate": "2026-07-31",
+      "asOfDate": "2026-08-31",
       "source": "IMF IRFCL",
-      "nonGoldReservesUsd": 6513324611,
-      "reservesAsOfDate": "2026-07-31",
+      "nonGoldReservesUsd": 6991287066,
+      "reservesAsOfDate": "2026-08-31",
       "valuationBasis": "market",
-      "impliedUsdPerOunce": 4026.6,
+      "impliedUsdPerOunce": 4562.75,
       "unitScaleApplied": null,
       "history": [
         {
@@ -44283,6 +44283,10 @@
         },
         {
           "asOfDate": "2026-07-31",
+          "reserveTonnes": 7.83
+        },
+        {
+          "asOfDate": "2026-08-31",
           "reserveTonnes": 7.83
         }
       ]
@@ -49297,12 +49301,12 @@
       "kind": "country",
       "region": "Europe",
       "reserveTonnes": 2.25,
-      "asOfDate": "2026-07-31",
+      "asOfDate": "2026-08-31",
       "source": "IMF IRFCL",
-      "nonGoldReservesUsd": 3214049784,
-      "reservesAsOfDate": "2026-06-30",
+      "nonGoldReservesUsd": 4043057398,
+      "reservesAsOfDate": "2026-08-31",
       "valuationBasis": "market",
-      "impliedUsdPerOunce": 4028.5504,
+      "impliedUsdPerOunce": 4457.1499,
       "unitScaleApplied": null,
       "history": [
         {
@@ -50099,6 +50103,10 @@
         },
         {
           "asOfDate": "2026-07-31",
+          "reserveTonnes": 2.25
+        },
+        {
+          "asOfDate": "2026-08-31",
           "reserveTonnes": 2.25
         }
       ]

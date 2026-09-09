@@ -25,8 +25,11 @@ for (const [event, label] of [
 }
 import { config } from './config.js';
 import { listProviders } from './services/priceProviders/index.js';
+import { startAutoRefresh } from './services/refresh.js';
 
 const app = createApp();
+
+if (config.autoRefresh.enabled) startAutoRefresh();
 
 app.listen(config.port, () => {
   const active = listProviders().find((p) => p.active);
@@ -41,6 +44,13 @@ app.listen(config.port, () => {
       `${config.rateLimit.priceHistory}/min price history, ${config.rateLimit.health}/min health`,
   );
   console.log(`  trust proxy:    ${config.trustProxy === false ? 'off' : config.trustProxy}`);
+  console.log(
+    `  auto refresh:   ${
+      config.autoRefresh.enabled
+        ? `every ${config.autoRefresh.intervalHours}h, when the snapshot is over ${config.autoRefresh.minAgeHours}h old`
+        : 'off'
+    }`,
+  );
   // Stated unconditionally, on purpose. This is a standing property of how the
   // limits behave, not an event, and the person who needs to know it is the one
   // about to put a proxy in front. warnIfProxied then reports the moment it

@@ -193,6 +193,19 @@ restated at the live gold price and moves with it. It tracks published shares
 closely but does not reproduce them exactly, and
 [backend/data/README.md](backend/data/README.md) records how far off it runs.
 
+**The data refreshes itself.** Detecting staleness was never the hard part: the
+app already said so on every page and in `/api/health`. The problem was that
+saying so did nothing, so a self-hosted copy would drift and the banner would
+become wallpaper. The server now rebuilds the snapshot from the IMF on start
+and every six hours, but only when it is more than a day old, since IRFCL
+publishes monthly and there is nothing to gain from rebuilding more often.
+
+It never blocks startup, never leaves the app worse off, and runs the same code
+path as `npm run build:data` as a child process. A failed rebuild changes
+nothing: the ingest writes to a temporary file and renames, so the served
+dataset is either the old complete one or the new complete one, never a
+half-written file. Set `AUTO_REFRESH=false` to pin a snapshot instead.
+
 **Staleness is treated as a bug, not a cosmetic detail.** The snapshot's build
 date and the data's own date are graded on separate clocks, because IRFCL always
 reports with a lag. `/api/health` reports `ok: false` when the snapshot goes

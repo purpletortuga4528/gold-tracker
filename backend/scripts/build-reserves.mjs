@@ -31,7 +31,7 @@
  * Usage:
  *   node scripts/build-reserves.mjs [--start-year 2010] [--out data/gold-reserves.json]
  */
-import { writeFile, readFile, mkdir } from 'node:fs/promises';
+import { writeFile, readFile, mkdir, rename, rm } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { troyOuncesToTonnes } from '../src/lib/units.js';
@@ -564,8 +564,20 @@ async function main() {
     countries: entries,
   };
 
+  // Written to a temporary file and renamed, not written in place. A rebuild
+  // can run while the API is serving, and a truncated JSON file would take the
+  // app down with a parse error until the next successful build. Rename is
+  // atomic within a filesystem, so a reader sees either the old file or the new
+  // one, never a half-written one.
   await mkdir(dirname(outPath), { recursive: true });
-  await writeFile(outPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  const tmpPath = `${outPath}.tmp-${process.pid}`;
+  try {
+    await writeFile(tmpPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+    await rename(tmpPath, outPath);
+  } catch (err) {
+    await rm(tmpPath, { force: true });
+    throw err;
+  }
 
   console.log(`\nWrote ${outPath}`);
   console.log(

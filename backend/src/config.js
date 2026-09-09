@@ -99,6 +99,21 @@ export const config = {
    */
   serveFrontend: (process.env.SERVE_FRONTEND ?? 'true').toLowerCase() !== 'false',
 
+  /**
+   * Keeping the reserves snapshot current while the server runs.
+   *
+   * Detecting staleness was never the hard part. Without this, a self-hosted
+   * copy quietly drifts: the banner appears, nobody acts on it, and the figures
+   * age. IRFCL publishes monthly, so minAgeHours is what stops a rebuild
+   * happening more often than the data can change, and intervalHours only
+   * decides how soon after publication a long-running server notices.
+   */
+  autoRefresh: {
+    enabled: (process.env.AUTO_REFRESH ?? 'true').toLowerCase() !== 'false',
+    intervalHours: int(process.env.AUTO_REFRESH_INTERVAL_HOURS, 6),
+    minAgeHours: int(process.env.AUTO_REFRESH_MIN_AGE_HOURS, 24),
+  },
+
   /** Comma-separated list of allowed CORS origins, or "*" to allow any. */
   corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:5173')
     .split(',')

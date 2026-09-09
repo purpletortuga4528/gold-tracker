@@ -185,15 +185,26 @@ test('numberParam enforces its bounds', () => {
   assert.throws(() => numberParam({ n: 'Infinity' }, 'n'), HttpError);
 });
 
+/*
+ * The compression tests below use /api/reserves, not the history route.
+ *
+ * The history payload is the reason the middleware exists, at 694 kB against
+ * the 29 kB of reserves, so it is the obvious thing to assert on. It is also
+ * served from the live LBMA feed, and this suite is otherwise entirely
+ * offline. Written against it, these two passed here and failed in CI on one
+ * Node version and not the other, because the runner got an HTML error page
+ * from LBMA and the assertions were made against a 502.
+ *
+ * 29 kB is comfortably over the 1 kB threshold, which is all these need. The
+ * end-to-end job measures the real history payload against a running API,
+ * where depending on the network is the point rather than an accident.
+ */
 test('large responses are compressed, small ones are not', async () => {
-  // The history payload is why the middleware is there at all: 694 kB of JSON
-  // was going out whole on every chart load, and it is 83 kB gzipped. Small
-  // bodies stay uncompressed, because the header and the CPU cost more than
-  // anything they would save.
   const s = await serve();
   try {
-    const big = await s.get('/api/price/history?range=max', { 'accept-encoding': 'gzip' });
-    assert.equal(big.headers.get('content-encoding'), 'gzip', 'the 694 kB payload should be compressed');
+    const big = await s.get('/api/reserves', { 'accept-encoding': 'gzip' });
+    assert.equal(big.status, 200);
+    assert.equal(big.headers.get('content-encoding'), 'gzip', 'a 29 kB payload should be compressed');
     assert.match(
       big.headers.get('vary') ?? '',
       /accept-encoding/i,
@@ -210,13 +221,13 @@ test('large responses are compressed, small ones are not', async () => {
 test('a caller that declines compression still gets the whole body', async () => {
   // This is why the history bucket is sized against the uncompressed figure.
   // The saving is real for a browser and entirely optional for everyone else,
-  // so 694 kB remains what one request can cost if the caller wants it to.
+  // so the full body remains what one request can cost if the caller wants it.
   const s = await serve();
   try {
-    const res = await s.get('/api/price/history?range=1y', { 'accept-encoding': 'identity' });
+    const res = await s.get('/api/reserves', { 'accept-encoding': 'identity' });
     assert.equal(res.status, 200);
     assert.equal(res.headers.get('content-encoding'), null);
-    assert.ok(Array.isArray(res.body.points) && res.body.points.length > 0, 'body should still be complete');
+    assert.ok(Array.isArray(res.body.countries) && res.body.countries.length > 0, 'body should still be complete');
   } finally {
     await s.stop();
   }

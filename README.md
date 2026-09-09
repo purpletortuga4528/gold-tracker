@@ -119,7 +119,9 @@ power of ten restores the reporter's own implied price to the market price of
 the month it filed. Both halves are load-bearing: the ratio test alone
 "corrected" Korea and Tunisia, whose figures were right all along and which
 simply carry gold at cost. Anything impossible that no power of ten explains is
-quarantined rather than published.
+quarantined rather than published, except an aggregate: the Euro Area row is 21
+central banks plus the ECB and legitimately sits past any single-country
+ceiling.
 
 **What this data is not:** a world total. IRFCL covers subscribers to the IMF
 reserves template, so non-reporting holders and the IMF's and BIS's own gold are

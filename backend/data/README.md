@@ -126,6 +126,15 @@ Anything impossible that no power of ten explains is **quarantined**: left out
 of the published file entirely, with the reason in `meta.quarantined`. Nothing
 unexplained is ever published as fact.
 
+Aggregates are the exception, and have to be. The ceiling is a statement about
+how much gold one country can hold, and the Euro Area row is 21 central banks
+plus the ECB: it stands at 10,807 t, well past the ceiling and entirely real.
+So `kind: "aggregate"` is exempt from quarantine. It is not exempt from
+detection, because an aggregate can be filed in the wrong unit like anything
+else; it simply loses the plausibility gate that protects the others, so an
+aggregate correction should be looked at by hand before it is believed. None
+is applied today.
+
 `validation.json` holds the tunables, plus a `manualScaleOverrides` escape hatch
 that is normally empty. Add an entry there only if detection cannot resolve a
 country and you have a citable source.

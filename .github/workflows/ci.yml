@@ -1,0 +1,178 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Weekly, because two of these go stale on their own rather than when someone
+  # changes the code: the IMF snapshot ages, and an advisory can be published
+  # against a dependency nobody has touched.
+  schedule:
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 22.12 is the floor the root package declares, set by Vitest 5 and
+        # jsdom 30. 24 is what this was developed on. Testing the floor makes
+        # it a fact rather than a hope.
+        node: ['22.12', '24']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install
+        run: npm run setup
+
+      - name: Backend tests
+        run: npm run test:backend
+
+      - name: Frontend tests
+        run: npm run test:frontend
+
+      - name: Production build
+        run: npm run build
+
+  backend-floor:
+    # The API declares a lower floor than the test tooling, so that claim needs
+    # its own proof. The frontend suite cannot run here, and is not asked to.
+    name: API runs on its declared floor (Node 20.6)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.6'
+
+      - name: Install backend only
+        run: npm install --prefix backend
+
+      - name: Backend tests
+        run: npm run test:backend
+
+      - name: Serves real data
+        run: |
+          npm start --prefix backend &
+          for i in $(seq 1 30); do
+            curl -sf -o /dev/null http://127.0.0.1:5174/api/health && break
+            sleep 1
+          done
+          curl -sf 'http://127.0.0.1:5174/api/reserves?limit=1' | grep -q '"countryCode":"USA"'
+
+  checks:
+    name: Data and docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install
+        run: npm run setup
+
+      - name: Documented figures still match reality
+        # The static half only. The live half runs in the `live` job, so a
+        # network failure is never mistaken for a stale document.
+        run: npm run check:docs
+
+      - name: Reserves snapshot freshness
+        # Exits 1 ageing, 2 stale. Reported, not enforced: the snapshot ageing
+        # is a fact about the IMF's publishing schedule and the age of this
+        # checkout, not a fault in the change being tested. The weekly run is
+        # what makes it visible.
+        run: npm run check:freshness --prefix backend
+        continue-on-error: true
+
+  audit:
+    name: Dependency advisories
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install
+        run: npm run setup
+
+      # Run per package: a bare `npm audit` at the root would miss the
+      # overrides in backend/package.json, which is where qs is pinned above
+      # what express asks for.
+      - name: Backend
+        run: npm audit --audit-level=moderate --prefix backend
+
+      - name: Frontend
+        run: npm audit --audit-level=moderate --prefix frontend
+
+  live:
+    name: End to end against a running API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install
+        run: npm run setup
+
+      - name: Start the API
+        run: |
+          npm start --prefix backend &
+          for i in $(seq 1 30); do
+            if curl -sf -o /dev/null http://127.0.0.1:5174/api/health; then
+              echo "API up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API did not start"; exit 1
+
+      - name: Documented sizes still match a live response
+        run: npm run check:docs -- --live
+
+      - name: Every API path is rate limited
+        # A path that answers with no RateLimit header at all is the bypass
+        # this repo has already had once, via /api/healthz.
+        run: |
+          for path in /api/health /api/healthz /api/health/sub /api/reserves /api/price/current /api/nope; do
+            curl -si "http://127.0.0.1:5174${path}" -o /tmp/headers
+            grep -qi '^ratelimit:' /tmp/headers || { echo "no rate limit on ${path}"; exit 1; }
+          done
+          echo "every path carries a RateLimit header"
+
+      - name: Error bodies leak no paths or upstream URLs
+        run: |
+          for path in '/api/reserves?kind=a&kind=b' '/api/reserves/ZZZ' '/api/nope' '/api/reserves?limit=0'; do
+            body=$(curl -s "http://127.0.0.1:5174${path}")
+            if echo "$body" | grep -qE '"error":"[^"]*(/home/|/Users/|node_modules|https?://)'; then
+              echo "leak from ${path}: ${body}"; exit 1
+            fi
+          done
+          echo "no leaks"
+
+      - name: Repeated query parameters are rejected, not crashed on
+        run: |
+          status=$(curl -s -o /dev/null -w '%{http_code}' \
+            'http://127.0.0.1:5174/api/reserves?kind=a&kind=b')
+          [ "$status" = "400" ] || { echo "expected 400, got ${status}"; exit 1; }

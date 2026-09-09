@@ -18,16 +18,26 @@ npm run dev
 Then open http://localhost:5173. The API runs on port 5174; the Vite dev server
 proxies `/api` to it, so the browser only ever talks to one origin.
 
-Requires Node 20.6 or newer (the backend reads `.env` through `dotenv` and uses
-`node --test`). Tested on Node 24.
+**Node 22.12 or newer** to work on it, which is what Vitest 5 and jsdom 30
+require. **The API itself runs on Node 20.6**, and CI proves that separately by
+installing only the backend on 20.6 and serving real data from it. Developed on
+Node 24.
 
 ```bash
-npm test           # backend unit and dataset tests
-npm run build      # production frontend build
-npm run build:data # refresh the reserves snapshot from the IMF
+npm test            # both suites: 50 backend, 117 frontend
+npm run test:backend
+npm run test:frontend
+npm run test:coverage
+npm run build       # production frontend build
+npm run build:data  # refresh the reserves snapshot from the IMF
 npm run check:freshness --prefix backend   # is the snapshot stale? exits 0/1/2
-npm run check:docs # do the figures quoted in these docs still match reality?
+npm run check:docs  # do the figures quoted in these docs still match reality?
 ```
+
+Every one of those runs in CI on push and pull request, plus weekly, because
+two of them go stale on their own rather than when someone changes the code:
+the IMF snapshot ages, and an advisory can be published against a dependency
+nobody has touched.
 
 ## Where the data comes from
 
@@ -139,7 +149,10 @@ gold-tracker/
       pages/             Dashboard, Countries, CountryDetail, Compare
       components/        table, charts, price headline, provenance panel
       lib/               API client, formatting, price context, appearance
-  scripts/dev.mjs        runs both servers with one Ctrl+C
+  scripts/
+    dev.mjs              runs both servers with one Ctrl+C
+    check-docs.mjs       verifies figures quoted in the docs against reality
+  .github/workflows/ci.yml
 ```
 
 ## Things worth knowing if you extend this
@@ -197,6 +210,13 @@ at reduced opacity (`text-ink/50`), which compiles to a `color-mix` against
 transparent, and pure black at 50 percent on white is `#808080`, about 3.9:1.
 Explicit rules in `index.css` restore full opacity to those utilities under high
 contrast. Add a new opacity step in a component and it needs adding there too.
+
+**The tests cover behaviour, not lines.** 167 of them: 50 backend, 117 frontend.
+The frontend suite covers 86 percent of statements with `coverage.all` enabled,
+so untested files count as zero rather than being left out of the report. What
+is deliberately not covered is `App.jsx`, `Dashboard.jsx` and `PriceChart.jsx`:
+routing, composition, and a Recharts component whose drawing jsdom cannot
+meaningfully verify. A chart that passes in jsdom is not evidence it renders.
 
 **Contrast is measured, not eyeballed.** The check walks every rendered text
 element and computes the real ratio against its resolved background. Sampled on

@@ -27,6 +27,10 @@ WorkingDirectory=/opt/gold-tracker
 Environment=NODE_ENV=production
 Environment=PORT=5174
 Environment=SERVE_FRONTEND=true
+# Listens on every interface as written, so this is reachable from the network
+# the moment it starts. Uncomment to keep it to this machine, for instance when
+# a reverse proxy on the same host is the only thing that should reach it.
+# Environment=HOST=127.0.0.1
 # The snapshot rebuilds itself, so no cron entry is needed. See
 # backend/.env.example for the interval settings.
 Environment=AUTO_REFRESH=true

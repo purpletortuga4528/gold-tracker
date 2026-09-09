@@ -37,7 +37,7 @@ installing only the backend on 20.6 and serving real data from it. Developed on
 Node 24.
 
 ```bash
-npm test            # both suites: 73 backend, 146 frontend
+npm test            # both suites: 75 backend, 146 frontend
 npm run test:backend
 npm run test:frontend
 npm run test:coverage
@@ -88,6 +88,14 @@ npm start
 All three stop cleanly. The app handles `SIGTERM` by closing the listener and
 letting in-flight requests finish, so `docker stop` and `systemctl stop` take
 well under a second instead of waiting out a timeout and killing the process.
+
+**All three listen on every interface**, which is Node's default and is kept,
+because a container or a home server that answered only on its own loopback
+would be useless. It is worth saying out loud rather than leaving to be
+discovered: starting it and publishing it on your network are the same act.
+`HOST=127.0.0.1` keeps it to the machine it runs on, and under Docker the port
+mapping is the place to decide it (`"127.0.0.1:5174:5174"`). The startup banner
+prints which interface it took either way.
 
 You do not need a cron entry for the data. The snapshot refreshes itself while
 the server runs.
@@ -294,7 +302,7 @@ straight out of `index.css` and composited in Node, so
 ground it can land on, including the tinted chips, in all four modes. No
 browser, no CSS engine, and it runs in CI with the rest of the suite.
 
-**The tests cover behaviour, not lines.** 219 of them: 73 backend, 146 frontend.
+**The tests cover behaviour, not lines.** 221 of them: 75 backend, 146 frontend.
 The frontend suite covers 86 percent of statements with `coverage.all` enabled,
 so untested files count as zero rather than being left out of the report. What
 is deliberately not covered is `App.jsx`, `Dashboard.jsx` and `PriceChart.jsx`:

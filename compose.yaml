@@ -4,6 +4,12 @@ services:
     build: .
     ports:
       # Host:container. Change the left side to move it off 5174.
+      #
+      # As written this publishes on every interface of the host, which is what
+      # makes it reachable from another machine and is usually the reason to
+      # run it in a container at all. If you want it only on the host itself,
+      # write "127.0.0.1:5174:5174" instead. Docker's port publishing bypasses
+      # the host firewall on many setups, so this is the place to decide it.
       - "5174:5174"
     environment:
       # The snapshot rebuilds itself from the IMF while the container runs, so

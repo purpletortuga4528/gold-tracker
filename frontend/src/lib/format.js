@@ -14,8 +14,8 @@ export function reserveValueUsd(tonnes, pricePerOunce) {
  * The denominator is deliberately rebuilt rather than taken from the IMF's own
  * total reserve assets, because reporters carry gold at inconsistent
  * valuations. The United States books its gold at the statutory $42.2222 an
- * ounce, so the IMF's own ratio makes gold look like 4 percent of US reserves
- * when the published figure is about 84 percent. Non-gold reserves are stable
+ * ounce, so the IMF's own ratio makes gold look like about 4 percent of US
+ * reserves when the published figure is about 84 percent. Non-gold reserves are stable
  * across valuations, so gold at market over (gold at market + non-gold) gives a
  * figure that tracks the published ones and moves with the gold price.
  */

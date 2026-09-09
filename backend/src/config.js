@@ -53,6 +53,18 @@ export const config = {
   port: positiveInt(process.env.PORT, 5174, 'PORT'),
 
   /**
+   * Which interface to listen on. Unset means every one, which is Node's
+   * default and stays the default here: a container or a home server that only
+   * answered on its own loopback would be useless.
+   *
+   * It is worth knowing rather than discovering, though. The rate limits exist
+   * partly to catch accidental exposure, and "started it" and "published it on
+   * the network" are the same act unless this is set. HOST=127.0.0.1 keeps it
+   * to the machine it runs on.
+   */
+  host: process.env.HOST?.trim() || undefined,
+
+  /**
    * Which price provider to use. "lbma" needs no key and is the default.
    * See src/services/priceProviders/index.js for the full list.
    */

@@ -31,9 +31,14 @@ const app = createApp();
 
 if (config.autoRefresh.enabled) startAutoRefresh();
 
-const server = app.listen(config.port, () => {
+// `config.host` undefined means every interface, which is what listen(port)
+// alone does. Passed explicitly so the two paths are one line, not two.
+const server = app.listen(config.port, config.host, () => {
   const active = listProviders().find((p) => p.active);
   console.log(`Gold Tracker API listening on http://localhost:${config.port}`);
+  console.log(
+    `  interface:      ${config.host ?? 'every interface (set HOST=127.0.0.1 to keep it local)'}`,
+  );
   console.log(`  price provider: ${active ? active.label : config.priceProvider}`);
   if (active && active.verified === false) {
     console.log('  ! this adapter is unverified; run: npm run verify:provider -- ' + active.id);

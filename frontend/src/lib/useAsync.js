@@ -13,7 +13,10 @@ export function useAsync(fn, deps) {
     Promise.resolve()
       .then(fn)
       .then((data) => !cancelled && setState({ data, loading: false, error: null }))
-      .catch((error) => !cancelled && setState({ data: null, loading: false, error: error.message }));
+      // `?? String(error)` because a thrown non-Error has no `.message`, and an
+      // undefined error reads as "no error" to every caller, which would render
+      // an empty panel instead of a failure.
+      .catch((error) => !cancelled && setState({ data: null, loading: false, error: error?.message ?? String(error) }));
     return () => {
       cancelled = true;
     };

@@ -6,6 +6,7 @@ import { reservesRouter } from './routes/reserves.js';
 import { getFreshness } from './services/freshness.js';
 import { securityHeaders, HttpError } from './lib/http.js';
 import { createLimiters, warnIfProxied } from './lib/rateLimit.js';
+import { serveFrontend } from './lib/serveFrontend.js';
 
 export function createApp() {
   const app = express();
@@ -63,6 +64,10 @@ export function createApp() {
 
   app.use('/api/price', priceRouter);
   app.use('/api/reserves', reservesRouter);
+
+  // After the API, before the 404: /api/* is always answered by the routes
+  // above, never by the app's client-side-routing fallback.
+  if (config.serveFrontend) serveFrontend(app);
 
   app.use((req, res) => {
     res.status(404).json({ error: `No route for ${req.method} ${req.path}` });

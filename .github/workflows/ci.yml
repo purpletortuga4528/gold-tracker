@@ -75,6 +75,59 @@ jobs:
           done
           curl -sf 'http://127.0.0.1:5174/api/reserves?limit=1' | grep -q '"countryCode":"USA"'
 
+  production:
+    # The self-hosting path is the one a user actually runs, so it gets checked
+    # end to end rather than assumed to follow from the parts.
+    name: Production single-process serving
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install
+        run: npm run setup
+
+      - name: Build and start, one process on one port
+        run: |
+          npm start > /tmp/prod.log 2>&1 &
+          for i in $(seq 1 90); do
+            curl -sf -o /dev/null http://127.0.0.1:5174/api/health && break
+            sleep 1
+          done
+          curl -sf -o /dev/null http://127.0.0.1:5174/api/health || { cat /tmp/prod.log; exit 1; }
+
+      - name: The app is served, and client routes survive a refresh
+        run: |
+          for path in / /countries /countries/USA '/compare?codes=POL'; do
+            code=$(curl -s -o /tmp/body -w '%{http_code}' "http://127.0.0.1:5174${path}")
+            [ "$code" = "200" ] || { echo "${path} -> ${code}"; exit 1; }
+            grep -q 'id="root"' /tmp/body || { echo "${path} did not return the app"; exit 1; }
+          done
+
+      - name: A missing asset is a 404, not the app shell
+        run: |
+          code=$(curl -s -o /tmp/body -w '%{http_code}' http://127.0.0.1:5174/assets/nope.js)
+          [ "$code" = "404" ] || { echo "expected 404, got ${code}"; exit 1; }
+          grep -q 'id="root"' /tmp/body && { echo "returned the app shell"; exit 1; }
+          echo ok
+
+      - name: The API is not shadowed by the app
+        run: |
+          curl -sf http://127.0.0.1:5174/api/reserves?limit=1 | grep -q '"countryCode":"USA"'
+          curl -s http://127.0.0.1:5174/api/nope | grep -q '"error"'
+
+      - name: The app and the API carry different policies
+        run: |
+          app=$(curl -si http://127.0.0.1:5174/ | grep -i '^content-security-policy:')
+          api=$(curl -si http://127.0.0.1:5174/api/health | grep -i '^content-security-policy:')
+          echo "$app" | grep -q "default-src 'self'"  || { echo "app CSP wrong: $app"; exit 1; }
+          echo "$api" | grep -q "default-src 'none'"  || { echo "api CSP wrong: $api"; exit 1; }
+          echo "$app" | grep -qE "https?://" && { echo "app CSP allows an external origin"; exit 1; }
+          echo ok
+
   checks:
     name: Data and docs
     runs-on: ubuntu-latest

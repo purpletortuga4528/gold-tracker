@@ -109,7 +109,13 @@ function stopAll(code) {
 }
 
 for (const { name, cwd, args, color } of TARGETS) {
-  const child = spawn(process.execPath, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, args, {
+    cwd,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    // Vite serves the app in development. If the API served a previously built
+    // copy as well, an edit would appear on one port and not the other.
+    env: { ...process.env, SERVE_FRONTEND: 'false' },
+  });
   children.push(child);
 
   const prefix = (stream) => (chunk) => {

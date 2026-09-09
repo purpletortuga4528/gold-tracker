@@ -10,13 +10,26 @@ gold is worth today, which is the thing neither source gives you on its own.
 
 ## Quick start
 
+To run it:
+
 ```bash
 npm run setup
+npm start
+```
+
+Then open http://localhost:5174. One process, one port: the API serves the
+built app alongside its own JSON, so there is no proxy to configure and nothing
+is cross-origin. `npm start` builds first, so it is the only command needed.
+
+To work on it, with hot reloading:
+
+```bash
 npm run dev
 ```
 
-Then open http://localhost:5173. The API runs on port 5174; the Vite dev server
-proxies `/api` to it, so the browser only ever talks to one origin.
+Then open http://localhost:5173. Vite serves the app and proxies `/api` to the
+API on 5174, and the API is told not to serve its own copy of the build, so an
+edit cannot appear on one port and not the other.
 
 **Node 22.12 or newer** to work on it, which is what Vitest 5 and jsdom 30
 require. **The API itself runs on Node 20.6**, and CI proves that separately by
@@ -248,6 +261,25 @@ Elliott Scott, Megan Eiswerth and Letters From Sweden; it is the 2024 second
 version of Atkinson Hyperlegible, whose letterforms are drawn so that easily
 confused characters stay distinct. Table cells are `whitespace-nowrap`: the face is wider than the system
 stack, and without it rows wrap instead of the table scrolling.
+
+**Self-hosting is one process, and the two policies differ.** In production the
+API serves the built app from `frontend/dist`, mounted after the API routes so
+`/api/*` can never be answered by the client-routing fallback. That fallback is
+restricted to navigations: a request for a missing `/assets/*.js` returns 404
+rather than the app shell, because answering 200 with HTML makes the browser
+report a syntax error in a file that does not exist.
+
+The Content Security Policy is deliberately not shared. The API sends
+`default-src 'none'`, which is right for JSON and would block the app's own
+bundle. The app gets `'self'` throughout, plus two concessions with reasons:
+`script-src-elem 'unsafe-inline'` for the theme boot script, which must run
+before first paint and so cannot be a separate request, and `style-src-attr
+'unsafe-inline'` because React and Recharts set style attributes and the charts
+render unstyled without it. No external origin appears in the policy at all: the
+typeface is self-hosted and the API is same-origin.
+
+If the app has not been built, the API says so on a plain page pointing at
+`npm run build`, rather than serving a broken page or a bare 404.
 
 **Charts step, they do not curve.** Reserve figures are month-end reports. A
 smooth line would imply a central bank's holding drifts continuously between

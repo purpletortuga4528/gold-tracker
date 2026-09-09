@@ -91,6 +91,14 @@ export const config = {
    */
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
 
+  /**
+   * Serve the built frontend from this process, so self-hosting is one command
+   * on one port. Off during development, where Vite serves the app on 5173 and
+   * proxies /api here; having both serve it would mean editing files and
+   * wondering which copy you are looking at.
+   */
+  serveFrontend: (process.env.SERVE_FRONTEND ?? 'true').toLowerCase() !== 'false',
+
   /** Comma-separated list of allowed CORS origins, or "*" to allow any. */
   corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:5173')
     .split(',')

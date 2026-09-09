@@ -232,9 +232,9 @@ serves the stale value flagged as stale rather than blanking the dashboard.
 
 **Gold's share of reserves is computed, never read off.** Reporters value gold
 inconsistently, so the IMF's own ratio puts US gold at about 4 percent of US
-reserves against a published figure near 84 percent. What the dataset stores is non-gold
-reserves, the one quantity stable across valuation methods; the share is
-restated at the live gold price and moves with it. It tracks published shares
+reserves against a published figure near 84 percent. What the dataset stores is
+non-gold reserves, the one quantity stable across valuation methods; the share
+is restated at the live gold price and moves with it. It tracks published shares
 closely but does not reproduce them exactly, and
 [backend/data/README.md](backend/data/README.md) records how far off it runs.
 
@@ -432,8 +432,8 @@ limit in the low tens, would reject the app's own normal traffic. A test
 replays that doubled burst and asserts none of it is rejected.
 
 Browsing five pages, one of them that Compare, is 15 requests in total. The
-600 limit is two orders of magnitude above what the app asks for, which is the
-point: it is there to stop a loop, not to ration a reader.
+600 limit is forty times that, which is the point: it is there to stop a loop,
+not to ration a reader.
 
 The buckets are separate on purpose: exhausting the history limit leaves the
 price headline and the reserves table working, and only the chart card errors.

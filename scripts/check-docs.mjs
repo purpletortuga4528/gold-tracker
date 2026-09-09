@@ -178,12 +178,19 @@ if (process.argv.includes('--counts')) {
   // it to read two numbers. These two commands are the `test` scripts in
   // backend/package.json and frontend/package.json; if either changes, this
   // reports that it could not read a total rather than reporting a wrong one.
+  //
+  // Colour is stripped before anything is parsed. Vitest emits SGR sequences
+  // when it detects GitHub Actions, so escape codes land between "Tests" and
+  // the number and a pattern written against the plain local output matches
+  // nothing at all. That is exactly how this check first failed: green here,
+  // "could not read a total" in CI.
+  const stripAnsi = (t) => t.replace(/\u001b\[[0-9;]*[A-Za-z]/g, '');
   const run = (cwd, args) => {
     try {
-      return execFileSync(process.execPath, args, { cwd: resolve(ROOT, cwd), encoding: 'utf8', stdio: 'pipe' });
+      return stripAnsi(execFileSync(process.execPath, args, { cwd: resolve(ROOT, cwd), encoding: 'utf8', stdio: 'pipe', maxBuffer: 32 * 1024 * 1024 }));
     } catch (err) {
       // A failing suite still prints its totals, which is what we are reading.
-      return `${err.stdout ?? ''}${err.stderr ?? ''}`;
+      return stripAnsi(`${err.stdout ?? ''}${err.stderr ?? ''}`);
     }
   };
   const backendOut = run('backend', ['--test']);
@@ -191,11 +198,18 @@ if (process.argv.includes('--counts')) {
   // README quotes. A floor in vite.config.js catches a regression; this catches
   // the prose drifting away from the number.
   const frontendOut = run('frontend', ['node_modules/vitest/vitest.mjs', 'run', '--coverage']);
-  const backend = Number(/^ℹ tests (\d+)$/m.exec(backendOut)?.[1]);
+  // Both reporter shapes: node:test prints "ℹ tests N" as spec and
+  // "# tests N" as TAP, and which one you get depends on whether stdout is a
+  // terminal.
+  const backend = Number(/^(?:ℹ|#) tests (\d+)$/m.exec(backendOut)?.[1]);
   const frontend = Number(/Tests\s+(\d+) passed/.exec(frontendOut)?.[1]);
 
   if (!Number.isFinite(backend) || !Number.isFinite(frontend)) {
-    bad('test counts', 'could not read a total from one of the runners');
+    // Which runner, and what it printed. "One of the runners" is not enough
+    // to act on when the failure only reproduces in CI.
+    const tail = (t) => t.trim().slice(-300);
+    const which = !Number.isFinite(backend) ? `backend: ${tail(backendOut)}` : `frontend: ${tail(frontendOut)}`;
+    bad('test counts', `could not read a total from the ${which}`);
   } else {
     let anyStale = false;
     for (const m of readme.matchAll(/(\d+) backend, (\d+) frontend/g)) {

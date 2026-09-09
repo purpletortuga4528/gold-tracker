@@ -20,7 +20,8 @@
     "test:backend": "npm test --prefix backend",
     "test:frontend": "npm test --prefix frontend",
     "test:coverage": "npm run test:coverage --prefix frontend",
-    "check:docs": "node scripts/check-docs.mjs"
+    "check:docs": "node scripts/check-docs.mjs",
+    "test:contrast": "npm run test:contrast --prefix frontend"
   },
   "_enginesNote": "The root scripts run the frontend test suite, which needs Vitest 5 (>=22.12) and jsdom 30 (>=22.22). The API itself runs on Node 20.6; see backend/package.json."
 }

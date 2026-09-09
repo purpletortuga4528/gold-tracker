@@ -180,6 +180,41 @@ jobs:
           [ "$elapsed" -lt 5000 ] || { echo "took too long; signals may not be reaching node"; exit 1; }
           docker logs gt 2>&1 | grep -q "stopped cleanly"
 
+  contrast:
+    name: Contrast on a rendered page
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install
+        run: npm run setup
+
+      - name: Install Chromium
+        # Only the browser this needs. --with-deps pulls the system libraries
+        # the GitHub runner does not ship.
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+
+      - name: Measure every rendered element in all four modes
+        # The palette is checked without a browser in the unit suite. This is
+        # the other half: what a component actually renders, including a
+        # background token colliding with a text token, which no palette
+        # pairing can reveal. It fails on any colour its parser cannot read,
+        # because a silent skip is how the published figures came to be wrong.
+        run: npm run test:contrast
+
+      - name: Keep the failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contrast-failure
+          path: frontend/test-results/
+          retention-days: 7
+
   checks:
     name: Data and docs
     runs-on: ubuntu-latest

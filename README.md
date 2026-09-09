@@ -41,14 +41,15 @@ npm test            # both suites: 77 backend, 151 frontend
 npm run test:backend
 npm run test:frontend
 npm run test:coverage
+npm run test:contrast  # contrast of every rendered element, in a real browser
 npm run build       # production frontend build
 npm run build:data  # refresh the reserves snapshot from the IMF
 npm run check:freshness --prefix backend   # is the snapshot stale? exits 0/1/2
 npm run check:docs  # do the figures quoted in these docs still match reality?
 ```
 
-CI runs the tests, the build, the docs check, the freshness check and
-`npm audit` on every push and pull request, and again weekly, because two of
+CI runs the tests, the contrast audit, the build, the docs check, the freshness
+check and `npm audit` on every push and pull request, and again weekly, because two of
 those go stale on their own rather than when someone changes the code: the IMF
 snapshot ages, and an advisory can be published against a dependency nobody has
 touched. Coverage runs as part of the docs check, which compares it against the
@@ -217,6 +218,7 @@ gold-tracker/
       components/        table, charts, price headline, provenance panel
       lib/               API client, formatting, price context, appearance
       index.css          the whole palette, and the high contrast layer
+    e2e/                 the contrast audit, run in a real browser
   scripts/
     dev.mjs              runs both servers with one Ctrl+C
     check-docs.mjs       verifies figures quoted in the docs against reality
@@ -310,11 +312,18 @@ routing, composition, and a Recharts component whose drawing jsdom cannot
 meaningfully verify. A chart that passes in jsdom is not evidence it renders.
 
 **Contrast is measured, not eyeballed.** Two checks, because neither is
-sufficient alone. `palette.test.js` pins the palette in CI. On top of that, a
-browser pass walks every rendered text element and computes the real ratio
-against its resolved background, which is the only way to catch a colour a
-component invented for itself. Sampled on `/countries`, the densest page, which
-renders every row; the element count is lower on other pages:
+sufficient alone, and both run in CI.
+
+`src/lib/palette.test.js` reads the palette straight out of `index.css` and
+composites every text token against every ground it can land on. No browser, so
+it runs with the rest of the unit suite in about a second.
+
+`npm run test:contrast` is the other half: Playwright loads the built app, in
+all four modes, and walks every rendered text element computing the real ratio
+against its resolved background. That is the only thing that catches a colour a
+component invented for itself, or a background token colliding with a text
+token on one element. Sampled on `/countries`, the densest page, which renders
+every row; the element count is lower on other pages:
 
 | Mode | Bar | Worst measured | Failing |
 |---|---|---|---|
@@ -323,8 +332,9 @@ renders every row; the element count is lower on other pages:
 | dark / normal | AA 4.5 | 6.45 | 0 of 638 |
 | dark / high | AAA 7.0 | 15.37 | 0 of 638 |
 
-Measured 2026-09-09. An element counts if it has a direct non-empty text node,
-is visible, and has a non-zero box.
+An element counts if it has a direct non-empty text node, is visible, and has a
+non-zero box. Those four rows are printed by `npm run test:contrast`, so this
+table is one command to re-derive rather than a number somebody remembers.
 
 Three real defects came out of running it, and the third is the one worth
 repeating. The light accent was darkened from `#a37814` to `#8a6412`, because
@@ -344,10 +354,12 @@ blind spot. The check reported the worst element it could parse and called it
 the worst element. A measurement that silently drops its hardest cases is worse
 than none, because it gets quoted.
 
-Two habits came out of that. Parse `oklab()` and `color-mix()`, or count what
-you skipped and fail if it is not zero. And prefer a check that cannot have a
-blind spot: the palette test reads solid hex values, so there is nothing for a
-parser to miss.
+Two habits came out of that, and both are now enforced rather than remembered.
+The audit parses `oklab()`, and it counts what it could not parse and fails if
+that is anything but zero, so the next colour syntax nobody anticipated stops
+the build instead of quietly leaving the sample. And it lives in the repository
+now: it used to be a snippet pasted into a console, which is most of the reason
+it was allowed to be wrong for so long.
 
 Measure on a real page load, not by flipping `data-theme` in the console and
 reading `getComputedStyle` straight after. Doing the latter returns styles the

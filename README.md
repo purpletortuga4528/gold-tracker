@@ -377,6 +377,17 @@ instance gives each its own buckets. That needs a shared store.
 `npm audit` is clean in both packages. `qs` is pinned via an override above what
 express asks for, and `react-router-dom` sits past the open-redirect advisory.
 
+## Licence
+
+The code is MIT, in [LICENSE](LICENSE).
+
+That covers the code only. The reserve figures in
+`backend/data/gold-reserves.json` are derived from IMF data, which carries its
+own terms, and the bundled typeface is under the SIL Open Font License.
+[NOTICE.md](NOTICE.md) records each of them with the source's own wording, so
+if you redistribute this or publish figures from it, read that first. No
+interpretation of the IMF's terms is offered here.
+
 ## Not investment advice
 
 This is a data viewer. It shows what central banks reported to the IMF and what

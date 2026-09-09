@@ -2,6 +2,7 @@
   "name": "gold-tracker-backend",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "API for the Gold Tracker: proxies gold price data and serves the curated central bank reserves dataset.",
   "engines": {

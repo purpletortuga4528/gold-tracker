@@ -55,6 +55,12 @@ export function startAutoRefresh({
   now = () => Date.now(),
   run = runBuild,
   log = console,
+  // Injected rather than mocked globally. node:test's mock.timers changed
+  // shape between Node versions, and its array form also replaces setTimeout,
+  // which deadlocks any helper that waits on one. Passing the scheduler its
+  // own timer functions keeps the test independent of all of that.
+  setIntervalFn = setInterval,
+  clearIntervalFn = clearInterval,
 } = {}) {
   let running = false;
   let lastAttempt = null;
@@ -113,7 +119,7 @@ export function startAutoRefresh({
   // possibly change; the interval only decides how soon after publication a
   // long-running server notices.
   maybeRefresh('startup').catch(() => {});
-  const timer = setInterval(() => {
+  const timer = setIntervalFn(() => {
     maybeRefresh('scheduled').catch(() => {});
   }, intervalToMs(intervalHours));
 
@@ -122,7 +128,7 @@ export function startAutoRefresh({
   timer.unref?.();
 
   return {
-    stop: () => clearInterval(timer),
+    stop: () => clearIntervalFn(timer),
     refreshNow: () => maybeRefresh('requested'),
     status: () => ({ running, lastAttempt, lastResult, intervalHours, minAgeHours }),
   };

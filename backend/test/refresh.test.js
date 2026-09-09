@@ -1,4 +1,4 @@
-import { test, describe, mock } from 'node:test';
+import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { startAutoRefresh } from '../src/services/refresh.js';
 
@@ -193,11 +193,24 @@ describe('lifecycle', () => {
     }
   });
 
-  test('the interval fires, and stop() stops it', async (t) => {
-    // Driven by mocked timers rather than by waiting. Real intervals are
-    // floored to a minute, so a wall-clock test here would pass even if stop()
-    // did nothing at all, which is worse than having no test.
-    t.mock.timers.enable({ apis: ['setInterval'] });
+  test('the interval fires, and stop() stops it', async () => {
+    // A hand-rolled timer rather than node:test's mock.timers. Its shape
+    // changed between Node versions, and the form the backend's Node 20.6
+    // floor accepts also replaces setTimeout, which deadlocks the idle()
+    // helper below. Injecting the timer keeps this test honest on every
+    // supported version.
+    let tick = null;
+    let cleared = false;
+    const setIntervalFn = (fn) => {
+      tick = fn;
+      return 'handle';
+    };
+    const clearIntervalFn = (handle) => {
+      if (handle === 'handle') {
+        cleared = true;
+        tick = null;
+      }
+    };
 
     let runs = 0;
     const scheduler = startAutoRefresh({
@@ -207,18 +220,21 @@ describe('lifecycle', () => {
         runs += 1;
       },
       log: recorder(),
+      setIntervalFn,
+      clearIntervalFn,
     });
+
     await idle(scheduler);
     const afterStartup = runs;
 
-    t.mock.timers.tick(60 * 60 * 1000);
+    tick();
     await idle(scheduler);
     assert.ok(runs > afterStartup, 'a scheduled tick should trigger a refresh');
 
     const beforeStop = runs;
     scheduler.stop();
-    t.mock.timers.tick(5 * 60 * 60 * 1000);
-    await idle(scheduler);
+    assert.equal(cleared, true, 'stop() must clear the interval it created');
+    assert.equal(tick, null);
     assert.equal(runs, beforeStop, 'no refresh should run after stop()');
   });
 });

@@ -40,7 +40,13 @@ const server = app.listen(config.port, config.host, () => {
     `  interface:      ${config.host ?? 'every interface (set HOST=127.0.0.1 to keep it local)'}`,
   );
   console.log(`  price provider: ${active ? active.label : config.priceProvider}`);
-  if (active && active.verified === false) {
+  if (active?.synthetic) {
+    // Loud, and at the top, because every price this process serves from here
+    // on is invented. Nobody should be able to start it this way by accident
+    // and not notice.
+    console.log('  !! EVERY PRICE THIS SERVES IS GENERATED. Not real data, for');
+    console.log('     demonstration only. Unset PRICE_PROVIDER to use the real feed.');
+  } else if (active && active.verified === false) {
     console.log('  ! this adapter is unverified; run: npm run verify:provider -- ' + active.id);
   }
   console.log(`  CORS origins:   ${config.corsOrigins.join(', ')}`);

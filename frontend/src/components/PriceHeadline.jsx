@@ -33,8 +33,15 @@ export function PriceHeadline() {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Pill tone="gold">{price.benchmark ?? price.providerLabel}</Pill>
-        <Pill>{price.kind === 'benchmark' ? 'Daily benchmark' : 'Spot'}</Pill>
+        <Pill tone={price.synthetic ? 'warn' : 'gold'}>
+          {price.benchmark ?? price.providerLabel}
+        </Pill>
+        {/* A generated price must never be labelled "Spot", which is the most
+            misleading word available for it. The warn tone is the same one
+            staleness uses: something here needs reading before believing. */}
+        <Pill tone={price.synthetic ? 'warn' : 'neutral'}>
+          {price.synthetic ? 'Not a real price' : price.kind === 'benchmark' ? 'Daily benchmark' : 'Spot'}
+        </Pill>
         <Pill>As of {formatDate(price.asOfDate)}</Pill>
         {price.stale && <Pill tone="warn">Stale: last refresh failed</Pill>}
       </div>

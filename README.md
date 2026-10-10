@@ -37,7 +37,7 @@ installing only the backend on 20.6 and serving real data from it. Developed on
 Node 24.
 
 ```bash
-npm test              # both suites: 96 backend, 151 frontend
+npm test              # both suites: 103 backend, 152 frontend
 npm run test:backend
 npm run test:frontend
 npm run test:coverage
@@ -180,6 +180,35 @@ it is trusted.
 
 Keys stay server side. The frontend never calls a provider and never sees a key.
 
+### Showing the app without a price feed
+
+In October 2026 the LBMA feed went behind a Cloudflare challenge and began
+answering 403 to anything that is not a browser. The app degrades honestly when
+that happens: reserve tonnages are unaffected because they do not depend on a
+price, and the headline, the chart, the dollar values and the share column say
+so rather than guessing. That is the right behaviour and it is useless for
+showing somebody what the app does.
+
+So there is a second provider, and it is not a data source:
+
+```bash
+PRICE_PROVIDER=demo npm start
+```
+
+**Every number it produces is invented.** It generates a daily series from a
+fixed seed, so the same chart appears on every run, shaped to look like gold's
+history only so that a chart of it reads as a chart. It is never the default
+and a test asserts that. It says what it is in the provider label, in a warn
+pill beside the price reading "Not a real price", in the note under the
+headline, in `/api/price/providers`, and in the startup banner, which refuses
+to be quiet about it:
+
+```
+price provider: DEMONSTRATION DATA (not real prices)
+!! EVERY PRICE THIS SERVES IS GENERATED. Not real data, for
+   demonstration only. Unset PRICE_PROVIDER to use the real feed.
+```
+
 ## Features
 
 - **Dashboard** with the current price, a historical chart (1m to max), the top
@@ -317,7 +346,7 @@ straight out of `index.css` and composited in Node, so
 ground it can land on, including the tinted chips, in all four modes. No
 browser, no CSS engine, and it runs in CI with the rest of the suite.
 
-**The tests cover behaviour, not lines.** 247 of them: 96 backend, 151 frontend.
+**The tests cover behaviour, not lines.** 255 of them: 103 backend, 152 frontend.
 The frontend suite covers 86 percent of statements with `coverage.all` enabled,
 so untested files count as zero rather than being left out of the report. What
 is deliberately not covered is `App.jsx`, `Dashboard.jsx` and `PriceChart.jsx`:

@@ -1,5 +1,6 @@
 import { config } from '../../config.js';
 import { lbmaProvider } from './lbma.js';
+import { demoProvider } from './demo.js';
 
 /*
  * One provider ships, and it is one that has actually been run.
@@ -13,6 +14,12 @@ import { lbmaProvider } from './lbma.js';
  */
 const registry = new Map();
 registry.set('lbma', () => lbmaProvider);
+
+// Generated prices, for showing the app when no real feed is reachable. Not a
+// data source: see demo.js, which explains itself at length because it is the
+// one thing in here capable of putting an invented number in front of someone.
+// Reached only by setting PRICE_PROVIDER=demo, and never the default.
+registry.set('demo', () => demoProvider);
 
 export function getProvider(id = config.priceProvider) {
   const factory = registry.get(id);
@@ -45,6 +52,9 @@ export function listProviders() {
       requiresKey: p.requiresKey,
       supportsHistory: p.supportsHistory,
       verified: p.verified !== false,
+      // Whether its numbers are made up. Carried all the way to the UI, which
+      // uses it to refuse to call a generated figure a price.
+      synthetic: p.synthetic === true,
       description: p.description,
       active: id === config.priceProvider,
     };

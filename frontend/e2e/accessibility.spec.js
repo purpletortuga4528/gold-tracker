@@ -207,9 +207,13 @@ test('the freshness banner is a live region when it has something to say', async
   await page.goto('/');
   await page.waitForLoadState('networkidle');
 
-  const banner = page.locator('[role="status"], [role="alert"]');
+  // Scoped by its own text, not by counting live regions on the page. The
+  // first version asserted there was exactly one, which held only while
+  // everything else was working: when the price feed went down, the error
+  // panels are live regions too and the count went up. A test that passes
+  // only when nothing else is broken is not much of a test.
+  const banner = page.locator('[role="status"], [role="alert"]').filter({ hasText: 'out of date' });
   await expect(banner).toHaveCount(1);
-  await expect(banner).toContainText('out of date');
 
   // The message is text, not a colour. A red panel says nothing to anyone who
   // cannot see it, and nothing at all to anyone who cannot distinguish it.

@@ -80,7 +80,11 @@ describe('failure', () => {
     show();
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
     expect(screen.getByText(/Could not reach the gold price provider/)).toBeInTheDocument();
-    expect(screen.getByText(/backend running/i)).toBeInTheDocument();
+    // The hint says what is still true, rather than guessing at a cause. It
+    // used to read "is the backend running on port 5174", which is exactly
+    // wrong in the case that actually happened: the backend was running and
+    // the LBMA feed had gone behind a Cloudflare challenge.
+    expect(screen.getByText(/tonnages are still right/i)).toBeInTheDocument();
   });
 
   test('shows a loading state while the request is in flight', async () => {

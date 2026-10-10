@@ -26,6 +26,18 @@ async function idle(scheduler, timeoutMs = 2000) {
 
 const settle = () => new Promise((r) => setTimeout(r, 20));
 
+/**
+ * A snapshot of a given age, so these tests do not depend on the age of the
+ * committed dataset. They used to: the one below asserted that a young
+ * snapshot is left alone, read the real file, and so passed in September and
+ * failed in October with nothing having changed but the date.
+ */
+const snapshotAged = (days) => async () => ({
+  overall: days > 70 ? 'stale' : 'fresh',
+  snapshot: { generatedAt: new Date(Date.now() - days * 86_400_000).toISOString(), ageDays: days },
+  data: { latestAsOfDate: '2026-08-31', ageDays: days + 9 },
+});
+
 describe('when it refreshes', () => {
   test('does nothing while the snapshot is younger than the threshold', async () => {
     // IRFCL publishes monthly. Rebuilding a snapshot that is a few hours old
@@ -34,6 +46,7 @@ describe('when it refreshes', () => {
     const log = recorder();
     const scheduler = startAutoRefresh({
       minAgeHours: 24,
+      freshness: snapshotAged(0),
       run: async () => {
         runs += 1;
       },

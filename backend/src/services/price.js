@@ -45,9 +45,27 @@ export async function getPriceHistory({ from, to, range } = {}) {
   const resolvedFrom = from ?? rangeToStartDate(range);
   const key = `history:${provider.id}`;
 
-  // The provider returns its whole series; we cache that once and slice per
-  // request, so switching chart ranges costs nothing upstream.
-  const { value } = await cache.get(key, config.cache.historySeconds, () => provider.getHistory({}));
+  // The same handling as getSpotPrice, for the same reasons. This used to have
+  // none, so when the provider became unreachable the chart said "Internal
+  // server error" while the price headline beside it said "Could not reach the
+  // gold price provider". Two panels, one cause, one of them blaming this
+  // server for somebody else's outage.
+  let value;
+  try {
+    // The provider returns its whole series; we cache that once and slice per
+    // request, so switching chart ranges costs nothing upstream.
+    ({ value } = await cache.get(key, config.cache.historySeconds, () => provider.getHistory({})));
+  } catch (err) {
+    const stale = cache.peekStale(key);
+    if (stale) {
+      console.warn(`[price] ${provider.id} history refresh failed, serving stale series:`, err);
+      value = { ...stale.value, stale: true, staleReason: 'The latest refresh from the price provider failed' };
+    } else {
+      // Logged, not returned: a provider's own message carries the request URL.
+      console.error(`[price] ${provider.id} history fetch failed:`, err);
+      throw new HttpError(502, 'Could not reach the gold price provider');
+    }
+  }
 
   const points = value.points.filter(
     (p) => (!resolvedFrom || p.date >= resolvedFrom) && (!to || p.date <= to),

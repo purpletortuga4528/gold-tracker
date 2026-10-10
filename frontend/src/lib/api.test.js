@@ -64,9 +64,25 @@ describe('error handling', () => {
     await expect(api.reserves()).rejects.toThrow(/non-JSON/);
   });
 
-  test('a network failure propagates rather than resolving to undefined', async () => {
+  test('an API that never answered says so, and says what to do about it', async () => {
+    // fetch rejects only when the request got no answer at all, so this is the
+    // one place that can tell "the server is down" from "the server is up and
+    // something upstream of it is down". The message has to carry that, because
+    // the panel showing it cannot work it out afterwards.
     fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
-    await expect(api.currentPrice()).rejects.toThrow(/Failed to fetch/);
+    await expect(api.currentPrice()).rejects.toThrow(/did not answer/i);
+    await expect(api.currentPrice()).rejects.toThrow(/npm start/);
+  });
+
+  test('an error the API itself reported is passed through untouched', async () => {
+    // The opposite case, and the reason the two are separated. A 502 means the
+    // server answered: telling someone to start it would send them to restart
+    // a process that is running perfectly.
+    fetchMock.mockResolvedValue(
+      jsonResponse({ error: 'Could not reach the gold price provider' }, 502),
+    );
+    await expect(api.currentPrice()).rejects.toThrow('Could not reach the gold price provider');
+    await expect(api.currentPrice()).rejects.not.toThrow(/did not answer/i);
   });
 
   test('a 200 with valid JSON resolves to the body', async () => {

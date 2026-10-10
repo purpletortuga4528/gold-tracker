@@ -55,6 +55,12 @@ export function startAutoRefresh({
   now = () => Date.now(),
   run = runBuild,
   log = console,
+  // Injected for the same reason `now` is. Reading the real snapshot made the
+  // tests depend on the age of a committed file, so the one asserting that a
+  // young snapshot is left alone passed in September and failed in October
+  // with no code change. A test whose result depends on the calendar is a test
+  // that will cry wolf exactly once and then be ignored.
+  freshness = getFreshness,
   // Injected rather than mocked globally. node:test's mock.timers changed
   // shape between Node versions, and its array form also replaces setTimeout,
   // which deadlocks any helper that waits on one. Passing the scheduler its
@@ -76,17 +82,17 @@ export function startAutoRefresh({
     running = true;
 
     try {
-      let freshness;
+      let current;
       try {
-        freshness = await getFreshness();
+        current = await freshness();
       } catch (err) {
         // No readable snapshot at all is exactly when a rebuild is most useful.
         log.warn?.('[refresh] could not read the snapshot, rebuilding:', err.message);
-        freshness = null;
+        current = null;
       }
 
       const ageHours =
-        freshness?.snapshot?.ageDays != null ? freshness.snapshot.ageDays * 24 : Infinity;
+        current?.snapshot?.ageDays != null ? current.snapshot.ageDays * 24 : Infinity;
       if (ageHours < minAgeHours) {
         return { skipped: `snapshot is ${Math.round(ageHours)}h old, under the ${minAgeHours}h threshold` };
       }
@@ -99,7 +105,7 @@ export function startAutoRefresh({
       // the cache is dropped.
       clearReservesCache();
       lastResult = { ok: true, at: new Date(now()).toISOString() };
-      const after = await getFreshness().catch(() => null);
+      const after = await freshness().catch(() => null);
       log.log?.(`[refresh] done. Latest figure now ${after?.data?.latestAsOfDate ?? 'unknown'}`);
       return lastResult;
     } catch (err) {

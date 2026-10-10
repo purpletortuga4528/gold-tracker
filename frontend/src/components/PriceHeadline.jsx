@@ -15,7 +15,10 @@ export function PriceHeadline() {
     return (
       <ErrorNote
         error={error}
-        hint="Is the backend running on port 5174? Start it with: npm run dev --prefix backend"
+        hint={
+          'The reserve figures below do not depend on this, so tonnages are still right. ' +
+          'Only the dollar values and the share of reserves need a price.'
+        }
       />
     );
   }

@@ -39,8 +39,11 @@ Then open http://localhost:5173. Vite serves the app and proxies `/api` to the
 API on 5174, and the API is told not to serve its own copy of the build, so an
 edit cannot appear on one port and not the other.
 
-**Node 22.12 or newer** to work on it, which is what Vitest 5 and jsdom 30
-require. **The API itself runs on Node 20.6**, and CI proves that separately by
+**Node 22.22.2 or newer** to work on it, which is what jsdom 30 requires. That
+floor rose from 22.12 when the November 2026 security updates landed, and
+check:docs now compares what the packages declare against what the installed
+dependencies actually demand, because this is the third documented number here
+to drift quietly. **The API itself runs on Node 20.6**, and CI proves that separately by
 installing only the backend on 20.6 and serving real data from it. Developed on
 Node 24.
 

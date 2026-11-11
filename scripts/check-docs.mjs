@@ -169,6 +169,57 @@ for (const [key, actual] of [
   }
 }
 
+// --- The declared Node floor must satisfy what the dependencies demand ------
+// A security update can raise a transitive engine requirement above the floor
+// a package declares, and the first sign is a CI job failing on the oldest
+// matrix entry. That is what jsdom 30 did in November 2026, taking the floor
+// from 22.12 to 22.22.2 without a word in any package.json.
+{
+  const satisfiesFloor = (floor, range) => {
+    // Enough semver for engine ranges of the form ">=x.y.z" and
+    // "^a.b.c || ^d.e.f || >=g.h.i". Anything unparsed is reported, not ignored.
+    const parse = (v) => v.split('.').map(Number);
+    const [fa, fb, fc] = parse(floor);
+    const clauses = range.split('||').map((c) => c.trim());
+    return clauses.some((clause) => {
+      const m = /^(\^|>=)?\s*(\d+)\.(\d+)\.(\d+)$/.exec(clause);
+      if (!m) return false;
+      const [, op, a, b, c] = m;
+      const [ma, mb, mc] = [Number(a), Number(b), Number(c)];
+      if (fa !== ma) return op === '>=' ? fa > ma : false;
+      if (fb !== mb) return fb > mb;
+      return fc >= mc;
+    });
+  };
+
+  const floors = {
+    'package.json': JSON.parse(read('package.json')).engines?.node,
+    'frontend/package.json': JSON.parse(read('frontend/package.json')).engines?.node,
+  };
+  const declared = floors['frontend/package.json'];
+  const floor = declared?.replace(/^>=/, '').trim();
+
+  if (!floor || !/^\d+\.\d+\.\d+$/.test(floor)) {
+    bad('frontend declares a Node floor', `engines.node is ${JSON.stringify(declared)}`);
+  } else if (floors['package.json'] !== declared) {
+    bad('the root and frontend floors agree', `root ${floors['package.json']}, frontend ${declared}`);
+  } else {
+    const offenders = [];
+    for (const name of ['jsdom', 'undici', 'vitest', 'vite']) {
+      let required;
+      try {
+        required = JSON.parse(read(`frontend/node_modules/${name}/package.json`)).engines?.node;
+      } catch {
+        continue; // not installed in this checkout
+      }
+      if (required && !satisfiesFloor(floor, required)) offenders.push(`${name} wants ${required}`);
+    }
+    if (offenders.length) {
+      bad('the declared Node floor is high enough', `floor is ${floor} but ${offenders.join('; ')}`);
+    } else ok(`Node floor (${floor}) satisfies every dependency checked`);
+  }
+}
+
 // --- No em or en dashes in authored prose ----------------------------------
 for (const [name, text] of [['README.md', readme], ['data/README.md', dataReadme]]) {
   // Escapes, not literals: this file would otherwise trip the very check it

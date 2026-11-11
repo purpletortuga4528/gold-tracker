@@ -1,6 +1,7 @@
 import { config } from '../../config.js';
 import { lbmaProvider } from './lbma.js';
 import { demoProvider } from './demo.js';
+import { metalsDevProvider } from './metalsdev.js';
 
 /*
  * One provider ships, and it is one that has actually been run.
@@ -14,6 +15,10 @@ import { demoProvider } from './demo.js';
  */
 const registry = new Map();
 registry.set('lbma', () => lbmaProvider);
+
+// The LBMA fix, republished under a licence metals.dev holds. Keyed, because
+// there is no longer a free door to the benchmark: see metalsdev.js.
+registry.set('metalsdev', () => metalsDevProvider);
 
 // Generated prices, for showing the app when no real feed is reachable. Not a
 // data source: see demo.js, which explains itself at length because it is the

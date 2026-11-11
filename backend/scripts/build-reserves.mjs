@@ -490,17 +490,13 @@ async function main() {
   const regions = new Map(Object.entries(regionsRaw ?? {}));
   const manualOverrides = new Map(Object.entries(config.manualScaleOverrides ?? {}));
 
-  console.log('Fetching the LBMA price series for unit detection');
-  const [spot, priceHistory] = await Promise.all([
-    lbmaProvider.getSpot(),
-    lbmaProvider.getHistory({}),
-  ]);
-  const priceOn = makePriceLookup(priceHistory.points);
-  console.log(
-    `  ${priceHistory.points.length} daily fixes, latest $${spot.priceUsdPerOunce}/oz ` +
-      `(${spot.benchmark}, ${spot.asOfDate})`,
-  );
-
+  /*
+   * The IMF comes first, deliberately. The price reference below can be
+   * unavailable for reasons that are nobody's fault, and when it was fetched
+   * first a blocked price feed masked everything after it: an IMF that had
+   * changed shape would have reported as "no price reference" and the weekly
+   * check would have said nothing was wrong.
+   */
   console.log(`Fetching country names from ${COUNTRY_CODELIST}`);
   const countryNames = parseCodelist(await getText(COUNTRY_CODELIST, 'codelist'));
   console.log(`  ${countryNames.size} country codes`);
@@ -511,6 +507,40 @@ async function main() {
     fetched[key] = await fetchIndicator(indicator, startYear);
     console.log(`  ${fetched[key].seriesCount} series, ${fetched[key].byCountry.size} economies`);
   }
+
+  /*
+   * The price series is not decoration. detectUnitScale decides whether a
+   * filing is in the wrong unit by asking whether a power of ten restores the
+   * reporter's own implied price to the market price of the month it filed.
+   * With no price to compare against there is no way to tell Brazil's
+   * 172,446 t from a real holding, so the only safe thing is to refuse.
+   *
+   * It exits 3 rather than 1 so a caller can tell "the IMF changed shape and
+   * the pipeline is broken" from "there was no price reference, so nothing was
+   * attempted". The first needs somebody. The second is weather.
+   */
+  console.log('Fetching the LBMA price series for unit detection');
+  let spot;
+  let priceHistory;
+  try {
+    [spot, priceHistory] = await Promise.all([
+      lbmaProvider.getSpot(),
+      lbmaProvider.getHistory({}),
+    ]);
+  } catch (err) {
+    const noPrice = new Error(
+      `the price reference is unavailable, so unit detection cannot run: ${err.message}. ` +
+        'Nothing was written and the existing snapshot is untouched.',
+    );
+    noPrice.exitCode = 3;
+    throw noPrice;
+  }
+  const priceOn = makePriceLookup(priceHistory.points);
+  console.log(
+    `  ${priceHistory.points.length} daily fixes, latest $${spot.priceUsdPerOunce}/oz ` +
+      `(${spot.benchmark}, ${spot.asOfDate})`,
+  );
+
   if (fetched.goldOunces.byCountry.size === 0) {
     throw new Error('No gold volume series parsed; refusing to write an empty dataset.');
   }
@@ -621,7 +651,11 @@ async function main() {
 // Only run when invoked directly, so the detection logic can be unit tested.
 if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
   main().catch((err) => {
-    console.error(`\nFAILED: ${err.message}`);
-    process.exitCode = 1;
+    // 3 means "could not even try", and is reported rather than treated as a
+    // broken pipeline. Anything else is a real failure.
+    const code = err.exitCode ?? 1;
+    console.error(`
+${code === 3 ? 'SKIPPED' : 'FAILED'}: ${err.message}`);
+    process.exitCode = code;
   });
 }

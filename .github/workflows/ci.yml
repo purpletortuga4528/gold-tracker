@@ -266,15 +266,37 @@ jobs:
 
       - name: Rebuild from the IMF
         # About four seconds against the live API. The unit tests cover the
-        # detection functions with fixtures; nothing covered the fetching,
-        # the SDMX parsing, the sector choice or the write until this.
-        run: npm run build:data
+        # detection functions with fixtures; nothing covered the fetching, the
+        # SDMX parsing, the sector choice or the write until this.
+        #
+        # Exit 3 means the price reference was unavailable, so unit detection
+        # could not run and nothing was attempted. The IMF half is fetched
+        # before that point, so a shape change there still fails properly. An
+        # upstream feed being blocked is not a broken pipeline and must not go
+        # red, for the same reason this job is weekly in the first place.
+        id: rebuild
+        run: |
+          set +e
+          npm run build:data
+          code=$?
+          set -e
+          if [ "$code" = "3" ]; then
+            echo "rebuilt=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No price reference available, so the snapshot was not rebuilt. The IMF side was still fetched and parsed."
+            exit 0
+          fi
+          echo "rebuilt=true" >> "$GITHUB_OUTPUT"
+          exit $code
 
       - name: The fresh snapshot is sound
         # Fails on shapes that mean the pipeline broke: no entries, a collapsed
         # country count, the US anchor moving, an implausible holding getting
         # published, data going backwards. It does NOT fail because figures
         # moved, which is the data working rather than the code breaking.
+        #
+        # Skipped when nothing was rebuilt, because comparing the committed
+        # snapshot against itself proves nothing and reads like a pass.
+        if: steps.rebuild.outputs.rebuilt == 'true'
         run: npm run check:ingest -- --before committed-snapshot.json --after backend/data/gold-reserves.json
 
       - name: Keep the fresh snapshot

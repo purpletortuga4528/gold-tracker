@@ -6,7 +6,15 @@ Two datasets, joined: how much gold each reporting economy holds (tonnes), and
 what an ounce of gold costs (USD). Multiply them and you get what a country's
 gold is worth today, which is the thing neither source gives you on its own.
 
-**It runs with no API keys and no signup.** Both data sources are open.
+**The reserve data needs no API key and no signup.** The IMF publishes it over
+an open SDMX API and that half of the app works out of the box.
+
+**The price does need one now.** LBMA closed its open feed in late 2026 and the
+benchmark went behind an ICE Benchmark Administration licence. The app ships a
+provider for metals.dev, which republishes the LBMA fix and has a free tier, and
+a clearly labelled generated-data provider for demonstrations. Without either,
+tonnages and every reserve figure still work and the price panel says why it
+cannot. [What happened, and what the options are](#the-price-feed-closed).
 
 ## Quick start
 
@@ -37,7 +45,7 @@ installing only the backend on 20.6 and serving real data from it. Developed on
 Node 24.
 
 ```bash
-npm test              # both suites: 103 backend, 152 frontend
+npm test              # both suites: 111 backend, 152 frontend
 npm run test:backend
 npm run test:frontend
 npm run test:coverage
@@ -149,13 +157,46 @@ absent. A footer on every page says the data is not a complete picture, and the
 dashboard carries the full provenance panel spelling out that the rows must not
 be summed into a world figure.
 
-### Price: LBMA Gold Price
+### The price feed closed
 
-The London Bullion Market Association publishes its daily auction benchmark as
-open JSON, in USD, GBP and EUR, back to April 1968. No key and no signup, the
-full history, and it is the benchmark the market actually references. Whether
-they rate limit it is not documented and has not been tested here, so the
-backend caches the series rather than assuming the endpoint is free to hammer.
+Until late 2026 the London Bullion Market Association published its daily
+auction benchmark as open JSON, in USD, GBP and EUR, back to April 1968. No key,
+no signup, the full history. This app was built around it.
+
+Between 9 September and 10 October 2026 that ended. The whole
+`prices.lbma.org.uk` subdomain went behind Cloudflare: 401 at the root, 403 on
+every path, for browsers as well as scripts. LBMA's own site now says a licence
+from IBA "is required in order to obtain, use or redistribute real-time or
+historical benchmark data", and the tables moved to a portal behind it. The
+other free routes had already gone: FRED deleted its ICE Benchmark
+Administration series in January 2022, and the World Gold Council removed
+historical LBMA prices in March 2025 at ICE's request.
+
+So there is no free route to the benchmark left, and `lbma.js` is kept for
+whoever can still reach it rather than deleted. It fails with that explanation
+rather than a generic network error, and only claims the closure when it
+actually sees a 401 or 403, because "I could not connect" and "this was
+withdrawn" are different facts.
+
+**Three options, none of them a default that pretends to work:**
+
+| `PRICE_PROVIDER` | What you get |
+|---|---|
+| `lbma` (default) | Nothing, unless the feed reopens. Reserves are unaffected |
+| `metalsdev` | The real LBMA AM and PM fixes, via metals.dev. Free key required |
+| `demo` | Generated prices, labelled as such everywhere they appear |
+
+**metals.dev needs a free key** and has a 100 request a month tier. That is
+about three a day, and the cache lifetimes this app ships would spend a month's
+quota before lunch, so the server does that arithmetic at startup and tells you
+what to set. See `backend/.env.example`.
+
+**That provider has never been run.** It is written from metals.dev's published
+documentation and is marked `verified: false` everywhere it surfaces, because
+two adapters written that way were deleted from this repository rather than
+shipped. `npm run verify:provider -- metalsdev` makes one real call and prints
+the raw response beside what the adapter read from it. Do that before trusting
+a number it produces, and send a patch flipping the flag if it holds up.
 
 It is **not a live spot feed**. The auction runs twice a day, so the price you
 see is the most recent published fix, tagged with its date. The app says
@@ -235,7 +276,7 @@ gold-tracker/
       config.js          every environment variable, parsed and guarded
       routes/            price and reserves HTTP routes
       services/
-        priceProviders/  lbma.js, plus README.md on adding a second
+        priceProviders/  lbma.js (closed), metalsdev.js, demo.js
         price.js         provider selection, caching, stale fallback
         reserves.js      dataset loading, search and filtering
         freshness.js     how stale the snapshot is, on two clocks
@@ -346,7 +387,7 @@ straight out of `index.css` and composited in Node, so
 ground it can land on, including the tinted chips, in all four modes. No
 browser, no CSS engine, and it runs in CI with the rest of the suite.
 
-**The tests cover behaviour, not lines.** 255 of them: 103 backend, 152 frontend.
+**The tests cover behaviour, not lines.** 263 of them: 111 backend, 152 frontend.
 The frontend suite covers 86 percent of statements with `coverage.all` enabled,
 so untested files count as zero rather than being left out of the report. What
 is deliberately not covered is `App.jsx`, `Dashboard.jsx` and `PriceChart.jsx`:
@@ -369,10 +410,10 @@ every row; the element count is lower on other pages:
 
 | Mode | Bar | Worst measured | Failing |
 |---|---|---|---|
-| light / normal | AA 4.5 | 5.37 | 0 of 640 |
-| light / high | AAA 7.0 | 11.52 | 0 of 640 |
-| dark / normal | AA 4.5 | 6.45 | 0 of 640 |
-| dark / high | AAA 7.0 | 15.37 | 0 of 640 |
+| light / normal | AA 4.5 | 5.37 | 0 of 643 |
+| light / high | AAA 7.0 | 11.52 | 0 of 643 |
+| dark / normal | AA 4.5 | 6.45 | 0 of 643 |
+| dark / high | AAA 7.0 | 15.37 | 0 of 643 |
 
 An element counts if it has a direct non-empty text node, is visible, and has a
 non-zero box. Those four rows are printed by `npm run test:browser`, so this

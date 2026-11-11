@@ -26,6 +26,7 @@ for (const [event, label] of [
 import { config } from './config.js';
 import { listProviders } from './services/priceProviders/index.js';
 import { startAutoRefresh } from './services/refresh.js';
+import { FREE_TIER_BUDGET } from './services/priceProviders/metalsdev.js';
 
 const app = createApp();
 
@@ -46,6 +47,30 @@ const server = app.listen(config.port, config.host, () => {
     // and not notice.
     console.log('  !! EVERY PRICE THIS SERVES IS GENERATED. Not real data, for');
     console.log('     demonstration only. Unset PRICE_PROVIDER to use the real feed.');
+  } else if (active?.id === 'lbma') {
+    // Said at startup rather than left for the first page load, because a dead
+    // default that looks like a bug is the worst first impression this can make.
+    console.log('  ! the LBMA open feed closed in late 2026 and now needs an IBA licence.');
+    console.log('    Reserves work regardless. For prices: PRICE_PROVIDER=metalsdev with a');
+    console.log('    metals.dev key, or PRICE_PROVIDER=demo for generated data.');
+  } else if (active?.id === 'metalsdev') {
+    // The free tier is 100 requests a month. The shipped cache lifetimes are
+    // sized for a feed with no quota at all and would spend that before lunch,
+    // so the arithmetic is done here rather than left to be discovered when
+    // the dashboard starts answering with a quota error.
+    const perMonth = Math.round(
+      30 * (86_400 / config.cache.spotSeconds + 86_400 / config.cache.historySeconds),
+    );
+    const affordable = perMonth <= FREE_TIER_BUDGET.requestsPerMonth;
+    console.log(`  cache lifetimes: ~${perMonth} upstream requests/month`);
+    if (!affordable) {
+      console.log(`  !! that is over the ${FREE_TIER_BUDGET.requestsPerMonth}/month free tier. Set in backend/.env:`);
+      console.log(`       CACHE_SPOT_SECONDS=${FREE_TIER_BUDGET.spotSeconds}`);
+      console.log(`       CACHE_HISTORY_SECONDS=${FREE_TIER_BUDGET.historySeconds}`);
+    }
+    if (active.verified === false) {
+      console.log('  ! this adapter is unverified; run: npm run verify:provider -- ' + active.id);
+    }
   } else if (active && active.verified === false) {
     console.log('  ! this adapter is unverified; run: npm run verify:provider -- ' + active.id);
   }

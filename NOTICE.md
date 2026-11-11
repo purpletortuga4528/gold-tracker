@@ -34,10 +34,16 @@ Source: <https://data.imf.org/en/datasets/IMF.STA:IRFCL>
 
 ## LBMA gold price
 
-Prices come from the London Bullion Market Association's published daily
-auction results, fetched at runtime from <https://prices.lbma.org.uk>. No LBMA
-data is stored in this repository; it is requested when the app runs and held
-only in memory. The LBMA's terms govern its use.
+Prices came from the London Bullion Market Association's published daily
+auction results, fetched at runtime from <https://prices.lbma.org.uk>. That feed
+closed in late 2026 and the benchmark now requires a licence from ICE Benchmark
+Administration, whose terms govern obtaining, using and redistributing it.
+
+**No price data of any kind is stored in this repository.** It never was: prices
+are requested when the app runs and held only in memory, and every dollar figure
+in `backend/data/gold-reserves.json` is derived from the IMF's own columns, not
+from any price feed. If you configure the metals.dev provider, that data arrives
+under your own key and metals.dev's terms, and likewise is never written here.
 
 ## Atkinson Hyperlegible Next
 

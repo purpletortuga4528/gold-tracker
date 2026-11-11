@@ -70,6 +70,16 @@ export const config = {
    */
   priceProvider: process.env.PRICE_PROVIDER ?? 'lbma',
 
+  /**
+   * metals.dev API key, for the provider that republishes the LBMA fix.
+   *
+   * Read here and used only in priceProviders/metalsdev.js. It never reaches
+   * the frontend, never appears in a response, and never goes in a log: the
+   * provider reports HTTP statuses rather than URLs, because the key travels
+   * as a query parameter.
+   */
+  metalsDevKey: process.env.METALS_DEV_API_KEY?.trim() || null,
+
   /** Cache lifetimes in seconds. */
   cache: {
     // The LBMA benchmark is set twice a day, so re-fetching often buys nothing.

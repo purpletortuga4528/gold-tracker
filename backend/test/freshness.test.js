@@ -10,8 +10,24 @@ import {
 const DAY = 24 * 60 * 60 * 1000;
 const daysAfter = (iso, n) => new Date(new Date(iso).getTime() + n * DAY);
 
-test('the shipped snapshot is currently fresh', async () => {
-  const f = await getFreshness();
+/*
+ * Every test here reads the committed snapshot and then judges it at a date
+ * derived from its own generatedAt, rather than at today's date. That is not
+ * fussiness: two of these used to assert the shipped file was fresh right now,
+ * which is true only for as long as somebody rebuilt it recently. They passed
+ * all through September and failed in November with no code change, exactly as
+ * refresh.test.js did before it. A test that fails on the calendar gets
+ * explained away once and ignored after that.
+ *
+ * Whether the shipped snapshot is actually current is a real question, and it
+ * has its own answer: `npm run check:freshness`, which reports it without
+ * pretending to be a verdict on the code.
+ */
+
+test('a freshly built snapshot is fresh on both clocks', async () => {
+  const { snapshot } = await getFreshness();
+  // One day after it was built, whenever that was.
+  const f = await getFreshness(daysAfter(snapshot.generatedAt, 1));
   assert.equal(f.overall, 'fresh');
   assert.equal(f.action, null);
 });
@@ -35,7 +51,8 @@ test('snapshot age and data age are graded on separate clocks', async () => {
   // freshly built snapshot always contains figures that are weeks old. If both
   // were judged on one threshold, either a healthy snapshot would look stale or
   // a genuinely abandoned one would look fine.
-  const f = await getFreshness();
+  const { snapshot } = await getFreshness();
+  const f = await getFreshness(daysAfter(snapshot.generatedAt, 1));
   assert.ok(f.data.ageDays > f.snapshot.ageDays, 'IMF figures should lag the build');
   assert.ok(DATA_WARN_DAYS > SNAPSHOT_WARN_DAYS, 'data is allowed to be older than the build');
   assert.equal(f.snapshot.status, 'fresh');

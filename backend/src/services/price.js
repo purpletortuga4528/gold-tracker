@@ -31,7 +31,10 @@ export async function getSpotPrice() {
     // provider that authenticates, whatever the key is passed in. Log it,
     // return something safe.
     console.error(`[price] ${provider.id} spot fetch failed:`, err);
-    throw new HttpError(502, 'Could not reach the gold price provider');
+    // publicMessage is a provider saying "this one is mine and safe to show".
+    // Anything without it is replaced, which is the default for the reason
+    // above: an upstream message can carry a URL and a key inside it.
+    throw new HttpError(502, err?.publicMessage ?? 'Could not reach the gold price provider');
   }
 }
 
@@ -63,7 +66,7 @@ export async function getPriceHistory({ from, to, range } = {}) {
     } else {
       // Logged, not returned: a provider's own message carries the request URL.
       console.error(`[price] ${provider.id} history fetch failed:`, err);
-      throw new HttpError(502, 'Could not reach the gold price provider');
+      throw new HttpError(502, err?.publicMessage ?? 'Could not reach the gold price provider');
     }
   }
 

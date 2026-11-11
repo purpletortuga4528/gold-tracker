@@ -1,7 +1,15 @@
 # Adding a price provider
 
-The app ships one provider, `lbma.js`, which needs no key and is verified
-working. This is what a second one has to look like.
+The app ships three providers:
+
+- `lbma.js`, which needs no key and was verified working, until LBMA closed the
+  feed in late 2026. It is kept for whoever can still reach it.
+- `metalsdev.js`, which republishes the LBMA fix and needs a free key. Written
+  from documentation and **never run**, so it is marked unverified.
+- `demo.js`, which generates prices for demonstrations and says so in every
+  field that reaches the UI. Never a default.
+
+This is what a fourth has to look like.
 
 Two adapters for GoldAPI.io and MetalpriceAPI used to live here. They were
 written from published documentation and never once executed, because running

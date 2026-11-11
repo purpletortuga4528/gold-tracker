@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { detectUnitScale, classifyValuation, buildEntry } from '../scripts/build-reserves.mjs';
+import { detectUnitScale, classifyValuation, buildEntry, makePriceLookup } from '../scripts/build-reserves.mjs';
 import { troyOuncesToTonnes, reserveValueUsd } from '../src/lib/units.js';
 
 const config = {
@@ -260,4 +260,57 @@ test('an economy with no usable observation is skipped rather than published emp
   });
   assert.equal(empty.skipped, 'no usable observations');
   assert.equal(empty.entry, undefined);
+});
+
+/*
+ * makePriceLookup, and what it does at the edges of the series it was given.
+ *
+ * This used to fall back to the earliest point for any date before the series
+ * began, which was harmless while the only provider ran from 1968 and nothing
+ * could fall outside it. The provider that replaced it offers a 30 day window,
+ * which would have had every filing since 2010 judged against this month's
+ * price. That is not a missed correction, which would be safe: detectUnitScale
+ * can match a different power of ten against the wrong reference and publish a
+ * figure wrong by a factor of ten.
+ */
+
+const SERIES = [
+  { date: '2026-10-13', priceUsdPerOunce: 4000 },
+  { date: '2026-10-14', priceUsdPerOunce: 4100 },
+  { date: '2026-11-11', priceUsdPerOunce: 4200 },
+];
+
+test('a date inside the series gets the last price on or before it', () => {
+  const priceOn = makePriceLookup(SERIES);
+  assert.equal(priceOn('2026-10-14'), 4100);
+  assert.equal(priceOn('2026-10-20'), 4100, 'carry the last fix forward, as the auction does');
+  assert.equal(priceOn('2026-11-11'), 4200);
+  assert.equal(priceOn('2027-01-01'), 4200, 'after the series, the latest price still applies');
+});
+
+test('a date before the series has no reference price at all', () => {
+  // 0, not the earliest point. detectUnitScale declines on a non-positive
+  // reference, so the filing is left alone and quarantined if impossible.
+  const priceOn = makePriceLookup(SERIES);
+  assert.equal(priceOn('2010-01-31'), 0);
+  assert.equal(priceOn('2026-10-12'), 0, 'one day before the series is still outside it');
+});
+
+test('declining is safe: no reference means no correction, not a guessed one', () => {
+  const priceOn = makePriceLookup(SERIES);
+  // Brazil's real filing, which a correct reference resolves with a divisor of
+  // 1000. With no reference it must not be corrected by some other factor.
+  const result = detectUnitScale({
+    rawOunces: 5_544_278_723,
+    reportedUsd: 22_417_000_000,
+    referencePrice: priceOn('2010-01-31'),
+    config,
+  });
+  assert.equal(result, null, 'an absent reference must produce no correction');
+});
+
+test('an empty series gives no reference for any date', () => {
+  const priceOn = makePriceLookup([]);
+  assert.equal(priceOn('2026-11-11'), 0);
+  assert.equal(priceOn(undefined), 0);
 });

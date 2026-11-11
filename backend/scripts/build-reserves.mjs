@@ -35,7 +35,7 @@ import { writeFile, readFile, mkdir, rename, rm } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { troyOuncesToTonnes } from '../src/lib/units.js';
-import { lbmaProvider } from '../src/services/priceProviders/lbma.js';
+import { getProvider } from '../src/services/priceProviders/index.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SDMX_BASE = 'https://api.imf.org/external/sdmx/2.1';
@@ -238,7 +238,7 @@ function latestCommonPeriod(...maps) {
  * it actually reported, so a country whose USD line stopped years ago is not
  * judged against today's price.
  */
-function makePriceLookup(points) {
+export function makePriceLookup(points) {
   const sorted = [...points].sort((a, b) => a.date.localeCompare(b.date));
   return (isoDate) => {
     if (!isoDate || sorted.length === 0) return sorted.at(-1)?.priceUsdPerOunce ?? 0;
@@ -254,8 +254,16 @@ function makePriceLookup(points) {
         hi = mid - 1;
       }
     }
-    // Before the series starts, fall back to its earliest point.
-    return sorted[best === -1 ? 0 : best].priceUsdPerOunce;
+    // Before the series starts there is NO reference price, and saying so is
+    // the whole point. This used to fall back to the earliest point, which was
+    // harmless while the series ran from 1968 and nothing could fall outside
+    // it. With a provider that offers a 30 day window, every filing from 2010
+    // onwards would have been judged against a price from this month, and
+    // detectUnitScale does not merely miss a correction when the reference is
+    // wrong: it can match a different power of ten and publish a figure off by
+    // a factor of ten. Returning 0 makes detection decline, so an unresolved
+    // impossible figure is quarantined rather than confidently mangled.
+    return best === -1 ? 0 : sorted[best].priceUsdPerOunce;
   };
 }
 
@@ -491,6 +499,34 @@ async function main() {
   const manualOverrides = new Map(Object.entries(config.manualScaleOverrides ?? {}));
 
   /*
+   * Which provider prices unit detection, resolved before any network call.
+   *
+   * It is resolved here rather than beside its first use because the refusal
+   * below is a configuration error, and making somebody wait through three
+   * large IMF downloads to be told their PRICE_PROVIDER is wrong is a waste of
+   * their time and the IMF's bandwidth.
+   *
+   * A generated price must never decide a published tonnage. The demo provider
+   * labels itself everywhere a price reaches a human, but unit detection is
+   * not a place where a human reads a price: it is where a price silently
+   * decides whether a country's reserves are divided by a thousand. An
+   * invented number there would be laundered into the dataset as an unlabelled
+   * fact, which is the one thing that provider's documentation promises cannot
+   * happen.
+   */
+  const pricer = getProvider();
+  if (pricer.synthetic) {
+    const generated = new Error(
+      `PRICE_PROVIDER is "${pricer.id}", which generates prices. Unit detection decides ` +
+        'whether a reported holding is divided by a power of ten, so a generated price ' +
+        'could put an invented tonnage into the published dataset as fact. Refusing. ' +
+        'Use a real provider, or leave the snapshot as it is.',
+    );
+    generated.exitCode = 1;
+    throw generated;
+  }
+
+  /*
    * The IMF comes first, deliberately. The price reference below can be
    * unavailable for reasons that are nobody's fault, and when it was fetched
    * first a blocked price feed masked everything after it: an IMF that had
@@ -519,14 +555,11 @@ async function main() {
    * the pipeline is broken" from "there was no price reference, so nothing was
    * attempted". The first needs somebody. The second is weather.
    */
-  console.log('Fetching the LBMA price series for unit detection');
+  console.log(`Fetching the price series for unit detection from ${pricer.label}`);
   let spot;
   let priceHistory;
   try {
-    [spot, priceHistory] = await Promise.all([
-      lbmaProvider.getSpot(),
-      lbmaProvider.getHistory({}),
-    ]);
+    [spot, priceHistory] = await Promise.all([pricer.getSpot(), pricer.getHistory({})]);
   } catch (err) {
     const noPrice = new Error(
       `the price reference is unavailable, so unit detection cannot run: ${err.message}. ` +
@@ -540,6 +573,29 @@ async function main() {
     `  ${priceHistory.points.length} daily fixes, latest $${spot.priceUsdPerOunce}/oz ` +
       `(${spot.benchmark}, ${spot.asOfDate})`,
   );
+
+  /*
+   * Does the price series actually cover the filings it will be judging?
+   *
+   * makePriceLookup returns no reference outside its range, which keeps a
+   * short series from producing a confidently wrong divisor. The cost is that
+   * an impossible filing outside the range cannot be resolved and is
+   * quarantined instead, so a provider offering thirty days would drop Brazil
+   * and Angola from the dataset without any single step having failed. Two
+   * countries quietly vanishing is not something to leave somebody to notice.
+   */
+  const earliestPrice = priceHistory.points[0]?.date ?? null;
+  const earliestFiling = `${startYear}-01-01`;
+  if (!earliestPrice || earliestPrice > earliestFiling) {
+    console.warn(
+      `\n  !! The price series starts at ${earliestPrice ?? 'nothing'}, but filings start at ` +
+        `${earliestFiling}.\n     Filings before the series have no reference price, so a unit ` +
+        `error in them\n     cannot be resolved and the economy is quarantined rather than ` +
+        `corrected.\n     Expect reporters that need a correction, currently BRA and AGO, to ` +
+        `drop out.\n     Compare meta.quarantined against the previous snapshot before ` +
+        `publishing this.\n`,
+    );
+  }
 
   if (fetched.goldOunces.byCountry.size === 0) {
     throw new Error('No gold volume series parsed; refusing to write an empty dataset.');

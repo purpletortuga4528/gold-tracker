@@ -57,3 +57,34 @@ test('the shipped cache defaults do not fit the free tier, which is why there is
     'the defaults now fit the free tier, so the startup warning is obsolete',
   );
 });
+
+test('the ingest refuses a generated price rather than laundering it into the data', async () => {
+  // Not a test of the provider but of what sits between it and the dataset.
+  // The demo provider is labelled everywhere a price reaches a human; unit
+  // detection is the one place a price reaches nobody and still decides a
+  // published number, so the refusal is the only thing guarding it.
+  const { execFileSync } = await import('node:child_process');
+  const { resolve, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const backend = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+  let output = '';
+  let code = 0;
+  try {
+    output = execFileSync(process.execPath, ['scripts/build-reserves.mjs'], {
+      cwd: backend,
+      encoding: 'utf8',
+      stdio: 'pipe',
+      env: { ...process.env, PRICE_PROVIDER: 'demo' },
+    });
+  } catch (err) {
+    output = `${err.stdout ?? ''}${err.stderr ?? ''}`;
+    code = err.status;
+  }
+
+  assert.equal(code, 1, 'a generated provider is a configuration error, not a skip');
+  assert.match(output, /which generates prices/);
+  assert.match(output, /Refusing/);
+  // And it must refuse before spending anything: no IMF download first.
+  assert.doesNotMatch(output, /series, \d+ economies/, 'it should refuse before fetching');
+});

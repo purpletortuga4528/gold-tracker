@@ -17,6 +17,33 @@ export function createApp() {
   // present a new IP per request and bypass every limit below.
   app.set('trust proxy', config.trustProxy);
 
+  /*
+   * Collapse repeated slashes before anything routes on the path.
+   *
+   * `//api/reserves` is the same resource as `/api/reserves` to every proxy and
+   * browser, and to nothing in Express. The rate limiters mount on `/api`, the
+   * SPA fallback excludes `/api/` with a negative lookahead, and a doubled
+   * slash slipped past both: the request answered 200 with no RateLimit header
+   * at all, served by the client-routing fallback that the comment below
+   * promises `/api/*` can never reach.
+   *
+   * No data leaked, because what it served was the 2.2 kB app shell rather than
+   * the API. What it was, was an unlimited path, which is the same shape as the
+   * /api/healthz bypass this repository has already had once. Normalising here
+   * rather than teaching every mount about it means a future mount cannot
+   * reintroduce it.
+   *
+   * The query string is left exactly as sent: slashes are meaningful inside it
+   * and collapsing them would corrupt a value somebody passed.
+   */
+  app.use((req, _res, next) => {
+    const queryAt = req.url.indexOf('?');
+    const path = queryAt === -1 ? req.url : req.url.slice(0, queryAt);
+    const query = queryAt === -1 ? '' : req.url.slice(queryAt);
+    if (path.includes('//')) req.url = path.replace(/\/{2,}/g, '/') + query;
+    next();
+  });
+
   const allowAny = config.corsOrigins.includes('*');
   app.use(cors({ origin: allowAny ? true : config.corsOrigins }));
 

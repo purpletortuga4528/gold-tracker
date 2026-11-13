@@ -321,3 +321,46 @@ test('a limit of zero really does block everything, which is why the guard exist
     await new Promise((r) => server.close(r));
   }
 });
+
+test('a doubled slash cannot dodge the rate limiter or the API', async () => {
+  // `//api/reserves` is the same resource to every proxy and browser, and was
+  // nothing to Express: the limiters mount on `/api` and the SPA fallback
+  // excludes `/api/` with a lookahead, and a doubled slash slipped past both.
+  // It answered 200 with no RateLimit header, served by the client-routing
+  // fallback that /api/* is documented as never reaching. No data leaked, but
+  // an unlimited path is the same shape as the /api/healthz bypass this
+  // repository has already had once.
+  const s = await serve();
+  try {
+    for (const path of ['//api/reserves', '/api//reserves', '///api//reserves']) {
+      const res = await s.get(path);
+      assert.equal(res.status, 200, `${path} should reach the API`);
+      assert.ok(res.headers.get('ratelimit'), `${path} must be rate limited`);
+      assert.match(
+        res.headers.get('content-type') ?? '',
+        /application\/json/,
+        `${path} must be answered by the API, not the app shell`,
+      );
+      const body = await res.json();
+      assert.ok(Array.isArray(body.countries), `${path} should return real data`);
+    }
+  } finally {
+    await s.stop();
+  }
+});
+
+test('normalising the path leaves the query string alone', async () => {
+  // Slashes are meaningful inside a query value, and collapsing them would
+  // quietly corrupt whatever somebody passed.
+  const s = await serve();
+  try {
+    const res = await s.get('/api/reserves?search=' + encodeURIComponent('a//b'));
+    assert.equal(res.status, 200);
+    // No country matches "a//b", so an empty result proves the value arrived
+    // intact rather than having been collapsed into something that matches.
+    const body = await res.json();
+    assert.equal(body.countries.length, 0);
+  } finally {
+    await s.stop();
+  }
+});

@@ -377,7 +377,7 @@ jobs:
         # A path that answers with no RateLimit header at all is the bypass
         # this repo has already had once, via /api/healthz.
         run: |
-          for path in /api/health /api/healthz /api/health/sub /api/reserves /api/price/current /api/nope; do
+          for path in /api/health /api/healthz /api/health/sub /api/reserves /api/price/current /api/nope //api/reserves /api//reserves; do
             curl -si "http://127.0.0.1:5174${path}" -o /tmp/headers
             grep -qi '^ratelimit:' /tmp/headers || { echo "no rate limit on ${path}"; exit 1; }
           done

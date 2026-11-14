@@ -23,12 +23,36 @@ import {
   changeOver,
 } from '../lib/format.js';
 
+/** Far above any real comparison; the series palette only has six colours. */
+const MAX_COMPARED = 12;
+
 export function Compare() {
   const [params, setParams] = useSearchParams();
-  const codes = (params.get('codes') ?? '')
-    .split(',')
-    .map((c) => c.trim().toUpperCase())
-    .filter(Boolean);
+
+  /*
+   * Deduplicated and capped, because this list comes from the URL.
+   *
+   * Every code here becomes a parallel request. Unbounded, a hand-made link
+   * with five hundred of them makes whoever opens it fire five hundred
+   * requests at their own server and spend their own rate limit, locking them
+   * out of the app for a minute for no reason they can see. The server is fine
+   * either way, and the failures panel below degrades honestly, but neither is
+   * a reason to issue requests nobody asked for.
+   *
+   * The cap is far above any real comparison. Six series is a busy chart and
+   * the colour palette only has six; past a dozen the chart is unreadable
+   * whatever it does.
+   */
+  const requested = [
+    ...new Set(
+      (params.get('codes') ?? '')
+        .split(',')
+        .map((c) => c.trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  ];
+  const codes = requested.slice(0, MAX_COMPARED);
+  const dropped = requested.length - codes.length;
   const { price } = usePrice();
   const c = useChartColors();
   const SERIES_COLORS = c.series;
@@ -118,6 +142,17 @@ export function Compare() {
               countries page
             </Link>
             .
+          </p>
+        )}
+
+        {/* Said, not done quietly. Dropping half a URL's worth of countries
+            and rendering the rest as though that was the request would be the
+            same silent-truncation habit this project keeps finding. */}
+        {dropped > 0 && (
+          <p className="mb-4 rounded-lg border border-warn-line bg-warn-bg p-3 text-sm text-warn-ink" role="status">
+            That link asked for {dropped + codes.length} economies. Showing the first{' '}
+            {MAX_COMPARED}; a chart with more than that is unreadable, and each one is a
+            request.
           </p>
         )}
 

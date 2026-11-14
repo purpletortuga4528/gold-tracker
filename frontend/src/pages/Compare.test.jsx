@@ -153,3 +153,35 @@ describe('normal use', () => {
     expect(api.reserve).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('codes from the URL', () => {
+  beforeEach(() => {
+    api.reserve.mockImplementation((code) => Promise.resolve(country(code, code, 100)));
+  });
+
+  test('duplicates are collapsed into one request each', async () => {
+    // Three identical codes used to be three identical requests.
+    at('?codes=USA,USA,USA');
+    await waitFor(() => expect(api.reserve).toHaveBeenCalled());
+    expect(api.reserve.mock.calls.map(([c]) => c)).toEqual(['USA']);
+  });
+
+  test('a link asking for too many is capped, and says so', async () => {
+    // Every code becomes a parallel request. Unbounded, a hand-made link makes
+    // whoever opens it spend their own rate limit for no reason they can see.
+    const many = Array.from({ length: 40 }, (_, i) => 'C' + String(i).padStart(2, '0'));
+    at('?codes=' + many.join(','));
+
+    await waitFor(() => expect(api.reserve).toHaveBeenCalled());
+    expect(api.reserve.mock.calls.length).toBeLessThanOrEqual(12);
+
+    // And the truncation is stated rather than performed quietly.
+    expect(await screen.findByText(/asked for 40 economies/i)).toBeInTheDocument();
+  });
+
+  test('an ordinary selection is untouched', async () => {
+    at('?codes=USA,DEU,CHN');
+    await waitFor(() => expect(api.reserve).toHaveBeenCalledTimes(3));
+    expect(screen.queryByText(/asked for/i)).toBeNull();
+  });
+});

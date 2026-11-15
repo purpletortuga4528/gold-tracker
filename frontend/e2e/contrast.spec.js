@@ -40,10 +40,21 @@ async function loadIn(page, { theme, contrast, font = 'default' }) {
     [theme, contrast, font],
   );
   await page.goto('/countries');
-  // The table renders from an API response, so wait for real rows rather than
-  // measuring an empty page and calling it a pass.
-  await expect(page.locator('tbody tr').first()).toBeVisible();
-  await expect(page.locator('tbody tr')).toHaveCount(85);
+
+  /*
+   * The table renders from an API response, so wait for every row the API has
+   * rather than measuring a half-drawn page and calling it a pass.
+   *
+   * The expected count comes from the API, not from a literal. It was
+   * `toHaveCount(85)`, which is the number of reporters in the committed
+   * snapshot: an economy joining or leaving IRFCL would have failed all six
+   * tests in this file, with a message about row counts and nothing to do with
+   * contrast. Derived, it also asserts something better, which is that the
+   * table rendered everything it was given.
+   */
+  const { total } = await (await page.request.get('/api/reserves')).json();
+  expect(total, 'the API returned no rows, so there is nothing to measure').toBeGreaterThan(50);
+  await expect(page.locator('tbody tr')).toHaveCount(total);
 }
 
 for (const mode of MODES) {

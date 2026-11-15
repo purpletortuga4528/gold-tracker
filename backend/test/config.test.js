@@ -47,7 +47,7 @@ test('HOST decides the interface, and unset means every one', async () => {
   }
 });
 
-test('a restricted HOST is actually honoured by the listener', async () => {
+test('a restricted HOST is actually honoured by the listener', async (t) => {
   // The config value is only half of it. This binds for real and checks that a
   // non-loopback address is refused, because a value that is read correctly and
   // then not passed to listen() would look identical in every other test.
@@ -70,6 +70,17 @@ test('a restricted HOST is actually honoured by the listener', async () => {
       await assert.rejects(
         fetch(`http://${external.address}:${port}/api/health`, { signal: AbortSignal.timeout(3000) }),
         'a bound-to-loopback server must not answer on a LAN address',
+      );
+    } else {
+      // Said out loud rather than passed over. The LAN refusal is the half of
+      // this test that matches its name, and it needs a non-loopback address
+      // to attempt at all. On a machine with none, the test still passes
+      // having checked only that loopback answers, which is a weaker claim
+      // than the name makes, and a silent pass is how a check comes to be
+      // trusted for something it never verified.
+      t.diagnostic(
+        'no non-internal IPv4 interface on this machine, so the LAN refusal was not attempted: ' +
+          'only the loopback half of this test ran',
       );
     }
   } finally {

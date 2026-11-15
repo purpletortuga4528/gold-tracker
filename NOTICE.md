@@ -14,18 +14,23 @@ Fund's International Reserves and Foreign Currency Liquidity (IRFCL) dataset,
 converted from fine troy ounces to tonnes. Regenerate it with
 `npm run build:data`.
 
-The IMF's own API returns this licence string with every response:
+The IMF's own API returns this licence string with every response, as the
+dataset's `LICENSE` attribute:
 
 > © International Monetary Fund Copyright. All Rights Reserved.
 > <https://www.imf.org/external/terms.htm>
 
-And this citation:
+And this citation, as `SUGGESTED_CITATION`:
 
 > International Monetary Fund. International Reserves and Foreign Currency
 > Liquidity (IRFCL), <https://data.imf.org/en/datasets/IMF.STA:IRFCL>.
 > Accessed on [current date].
 
 Both strings are reproduced verbatim from the API response, not paraphrased.
+The attribute names are given so that anyone can check that for themselves
+against a response, and `npm run check:docs -- --live` does exactly that: if
+the IMF rewords either one, this file becomes a misquote, and nothing else
+here would notice.
 Read the IMF's terms yourself before redistributing the data or publishing
 figures derived from it. Nothing in this repository grants you any right to it,
 and no reading of those terms is offered here.

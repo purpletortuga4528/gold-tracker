@@ -81,7 +81,7 @@ feed still has the shape `lbma.js` reads, which matters more than it sounds.
 
 ## Hosting it
 
-Three ways, in order of how little you have to think about.
+Three ways, in order of how little you have to think about it.
 
 **Docker.** One service, one port, no database and no reverse proxy:
 

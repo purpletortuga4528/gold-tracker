@@ -133,12 +133,55 @@ for (const [key, actual] of [
   } else ok(`README country count (${quoted})`);
 }
 {
+  /*
+   * The US anchor, which is the most load-bearing number in the project: if
+   * the ounce-to-tonne conversion breaks, every dollar figure on every page
+   * breaks with it, and this sentence is where that is checked by eye.
+   *
+   * The previous version of this check could not detect a drifted figure. It
+   * was `/8,133\.5 t/.test(dataReadme)`, a presence test: it asked only
+   * whether that string appeared somewhere in the file, and the file contains
+   * it twice. Changing the one in the sanity-anchor sentence to 8,134.5 left
+   * the other satisfying the regex, and the check reported ok against prose
+   * that now said something false. It also wrote 8133.5 in twice, which the
+   * rule at the top of this file forbids for exactly this reason.
+   *
+   * Nothing is hardcoded now. The sentence states both the ounces and the
+   * tonnes, so the conversion it asserts is recomputed from its own numbers
+   * and checked against the dataset, and every other tonnage figure of that
+   * magnitude in the file has to agree with it.
+   */
   const usa = dataset.countries.find((c) => c.countryCode === 'USA');
-  const quoted = /8,133\.5 t/.test(dataReadme);
-  if (!quoted) bad('data/README quotes the US anchor', 'the 8,133.5 t figure is gone');
-  else if (Math.abs(usa.reserveTonnes - 8133.5) > 0.1) {
-    bad('data/README US anchor', `dataset now says ${usa.reserveTonnes}`);
-  } else ok(`data/README US anchor (${usa.reserveTonnes} t)`);
+  const GRAMS_PER_TROY_OUNCE = 31.1034768; // definitional, not a measurement
+  // \s+ rather than literal spaces: the sentence wraps, and the first version
+  // of this regex required a single space before the tonnage and so reported
+  // the sentence missing on a file where it was present and correct.
+  const anchor = /reports\s+([\d,]+)\s+fine troy ounces,\s+giving\s+([\d,]+\.\d+)\s+t/.exec(dataReadme);
+
+  if (!anchor) {
+    bad('data/README US anchor', 'the sentence stating the ounces and the tonnes is gone');
+  } else {
+    const ounces = Number(anchor[1].replace(/,/g, ''));
+    const statedTonnes = Number(anchor[2].replace(/,/g, ''));
+    const fromOunces = (ounces * GRAMS_PER_TROY_OUNCE) / 1e6;
+
+    // Every figure of that magnitude in the file, so a second mention cannot
+    // disagree with the first.
+    const sameMagnitude = [...dataReadme.matchAll(/\b(8,\d{3}\.\d+) t\b/g)].map((m) =>
+      Number(m[1].replace(/,/g, '')),
+    );
+    const disagreeing = [...new Set(sameMagnitude)].filter((v) => Math.abs(v - statedTonnes) > 0.1);
+
+    if (Math.abs(fromOunces - statedTonnes) > 0.1) {
+      bad('data/README US anchor', `${ounces} oz converts to ${fromOunces.toFixed(2)} t, prose says ${statedTonnes}`);
+    } else if (Math.abs(usa.reserveTonnes - statedTonnes) > 0.1) {
+      bad('data/README US anchor', `prose says ${statedTonnes} t, dataset says ${usa.reserveTonnes}`);
+    } else if (disagreeing.length) {
+      bad('data/README US anchor', `the file also says ${disagreeing.join(', ')} t for the same holding`);
+    } else {
+      ok(`data/README US anchor (${statedTonnes} t, from ${anchor[1]} oz, ${sameMagnitude.length} mentions agree)`);
+    }
+  }
 }
 
 // --- The plausibility ceiling quoted in prose ------------------------------
@@ -449,6 +492,56 @@ if (process.argv.includes('--counts')) {
 if (process.argv.includes('--live')) {
   const base = `http://127.0.0.1:${config.port}`;
   const size = async (path) => (await (await fetch(base + path)).text()).length;
+
+  /*
+   * NOTICE.md says the IMF licence and citation are reproduced verbatim. That
+   * is the one claim in this repository with legal weight rather than
+   * documentary weight, and it is a claim about somebody else's wording, so it
+   * can stop being true without anything here changing. If the IMF rewords
+   * either string, that file silently becomes a misquote.
+   *
+   * One tiny query, one country and one month, carries both attributes.
+   */
+  {
+    const notice = read('NOTICE.md');
+    const url =
+      'https://api.imf.org/external/sdmx/2.1/data/IMF.STA,IRFCL/USA.IRFCLDT1_IRFCL56V_FTO..M' +
+      '?startPeriod=2026-07&endPeriod=2026-07';
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(45_000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const xml = await res.text();
+
+      const attr = (name) => new RegExp(`${name}="([^"]*)"`).exec(xml)?.[1];
+      // Compared with whitespace collapsed: NOTICE.md wraps both strings over
+      // two lines and renders the URLs as Markdown autolinks, neither of which
+      // changes a word.
+      // Brackets out first, whitespace collapsed second, and in that order:
+      // doing it the other way leaves a double space wherever a "> " blockquote
+      // marker was removed, so the strings failed to match while being
+      // word-for-word identical.
+      const flat = (s) =>
+        s
+          .replace(/[<>]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+      const noticeFlat = flat(notice);
+
+      const drifted = [];
+      for (const name of ['LICENSE', 'SUGGESTED_CITATION']) {
+        const value = attr(name);
+        if (!value) drifted.push(`${name} is no longer in the response`);
+        else if (!noticeFlat.includes(flat(value))) {
+          drifted.push(`${name} now reads: ${flat(value).slice(0, 120)}`);
+        }
+      }
+
+      if (drifted.length) bad('NOTICE.md quotes the IMF verbatim', drifted.join('; '));
+      else ok('NOTICE.md quotes the IMF verbatim (LICENSE and SUGGESTED_CITATION)');
+    } catch (err) {
+      skip('NOTICE.md quotes the IMF verbatim', `the IMF API could not be read: ${err.message}`);
+    }
+  }
 
   /**
    * Whether a route can be measured at all right now.

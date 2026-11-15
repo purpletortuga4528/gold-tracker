@@ -97,6 +97,28 @@ rebuilt in seventy days is not healthy in any sense that matters, and a check
 that only pings the port would call it fine. A named volume keeps the refreshed
 snapshot across rebuilds.
 
+> **The container will report unhealthy, and that is this repository's fault
+> rather than yours.** The committed snapshot was built on 2026-09-09, and the
+> snapshot clock calls anything over seventy days stale, so it crossed that
+> line on 2026-11-18. `/api/health` answers `ok: false` from then on and the
+> healthcheck follows it.
+>
+> It cannot be refreshed. `build:data` prices each filing against the gold
+> price of its own month, so it needs a price series going back to 2010, and
+> no provider that ships here can supply one: LBMA is closed, and metals.dev
+> serves a thirty day window. Set a provider and the rebuild exits 3 having
+> written nothing, which is the honest outcome and not a working one.
+>
+> The threshold has deliberately not been raised to hide this. Seventy days
+> unrebuilt is what the snapshot is, and an app that reported itself healthy
+> while serving figures it cannot refresh would be doing the one thing the
+> whole freshness apparatus here exists to prevent. The reserve figures are
+> still correct as filed, with the dates they were filed on, and every page
+> says so. What has stopped is the refreshing, not the data.
+>
+> `AUTO_REFRESH=false` stops the server attempting a rebuild it cannot
+> complete. Nothing else about the app changes.
+
 **systemd**, if you would rather not use Docker. A unit is in
 [deploy/gold-tracker.service](deploy/gold-tracker.service), with the hardening
 options set and `ReadWritePaths` limited to the one directory the app writes.

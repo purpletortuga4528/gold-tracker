@@ -13,7 +13,11 @@
       // renders light, then flips, which is worst for exactly the people the
       // dark and hyperlegible views are for. Kept inline and tiny on purpose:
       // an external file would be another round trip before the first frame.
-      // The keys must match THEME_KEY and FONT_KEY in src/lib/useTheme.jsx.
+      // The keys and the allowlists below must match THEME_KEY, FONT_KEY and
+      // CONTRAST_KEY, and THEMES, FONTS and CONTRASTS, in src/lib/useTheme.jsx.
+      // Nothing makes that true at runtime, so check:docs compares the two
+      // files: a drift here is a flash of the wrong appearance, which is the
+      // one thing this script exists to prevent.
       (function () {
         try {
           // Values are checked against the same allowlists the React side

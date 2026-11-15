@@ -271,6 +271,41 @@ for (const [name, text] of [['README.md', readme], ['data/README.md', dataReadme
   else ok(`${name} dash policy`);
 }
 
+// --- The pre-paint boot script agrees with the React side -----------------
+/*
+ * index.html resolves the saved appearance before first paint, which means it
+ * duplicates the storage keys and the value allowlists that useTheme.jsx owns.
+ * Nothing reconciles them at runtime. A drift gives exactly the flash of the
+ * wrong theme the script was added to prevent, and only on a real page load in
+ * a browser with something already in localStorage, which is the hardest case
+ * to notice and the one no unit test sees.
+ */
+{
+  const html = read('frontend/index.html');
+  const theme = read('frontend/src/lib/useTheme.jsx');
+
+  const pairs = [
+    ['theme key', /THEME_KEY = '([^']+)'/, /pick\('([^']+)', \['light'/],
+    ['font key', /FONT_KEY = '([^']+)'/, /'([^']+)', \['default'/],
+    ['contrast key', /CONTRAST_KEY = '([^']+)'/, /'([^']+)', \['normal'/],
+    ['themes', /const THEMES = \[([^\]]+)\]/, /\[('light'[^\]]*)\]/],
+    ['fonts', /const FONTS = \[([^\]]+)\]/, /\[('default'[^\]]*)\]/],
+    ['contrasts', /const CONTRASTS = \[([^\]]+)\]/, /\[('normal'[^\]]*)\]/],
+  ];
+
+  const norm = (s) => s.replace(/\s+/g, '');
+  const drifted = [];
+  for (const [what, jsRe, htmlRe] of pairs) {
+    const inJs = claims(theme, jsRe)[0];
+    const inHtml = claims(html, htmlRe)[0];
+    if (inJs === undefined || inHtml === undefined) drifted.push(`${what}: could not be read from both files`);
+    else if (norm(inJs) !== norm(inHtml)) drifted.push(`${what}: useTheme has ${inJs}, index.html has ${inHtml}`);
+  }
+
+  if (drifted.length) bad('index.html boot script matches useTheme.jsx', drifted.join('; '));
+  else ok(`index.html boot script matches useTheme.jsx (${pairs.length} keys and lists)`);
+}
+
 // --- No component names a benchmark ------------------------------------
 /*
  * The chart's tooltip used to read "LBMA PM fix" from a string literal, for

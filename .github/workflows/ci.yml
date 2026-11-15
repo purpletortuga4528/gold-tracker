@@ -25,9 +25,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 22.22 is the floor the root package declares, set by jsdom 30 and
-        # jsdom 30. 24 is what this was developed on. Testing the floor makes
-        # it a fact rather than a hope.
+        # 22.22 is the floor the root package declares. jsdom 30 sets it, and
+        # is the only dependency that asks for more than 22.12: it wants
+        # ^22.22.2 || ^24.15.0 || >=26. check:docs re-derives that from the
+        # lockfile rather than trusting this comment. 24 is what this was
+        # developed on. Testing the floor makes it a fact rather than a hope.
         node: ['22.22', '24']
     steps:
       - uses: actions/checkout@v4

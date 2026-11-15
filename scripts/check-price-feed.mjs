@@ -160,6 +160,26 @@ export function checkFeed(rows, spot, now = Date.now()) {
 
 /** Only when run directly, so importing this for the tests costs no network. */
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('check-price-feed.mjs')) {
+  /*
+   * These branches set exitCode and fall through; none of them calls
+   * process.exit().
+   *
+   * Calling it here aborted the process on Windows. The SKIP path below runs
+   * immediately after an HTTPS request, so the TLS connection is still being
+   * torn down, and exiting into that teardown trips a libuv assertion:
+   *
+   *   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING),
+   *   file src\win\async.c, line 94
+   *
+   * The process then exited 127. So the one path this script is most careful
+   * about, the SKIP that deliberately refuses to fail a build over somebody
+   * else's outage, was the path that crashed and failed the build anyway, with
+   * a message about neither the feed nor the build.
+   *
+   * It is the exit that does it, not the request's abort timer: it reproduces
+   * identically with the signal removed, and AbortSignal.timeout is unref'd so
+   * it holds nothing open. Letting the process end on its own is the whole fix.
+   */
   let rows;
   try {
     const res = await fetch(FEEDS.pm, { signal: AbortSignal.timeout(30_000) });
@@ -170,26 +190,35 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
     // shape as wrong when it was never seen. Same reasoning as check-docs' SKIP.
     console.log(`  SKIP  the LBMA PM feed could not be read: ${err.message}`);
     console.log('\nThat is an upstream outage. Nothing here is evidence about the feed\'s shape.');
-    process.exit(0);
+    process.exitCode = 0;
+    rows = null;
   }
 
-  let spot = null;
-  try {
-    const { lbmaProvider } = await import(`file://${resolve(ROOT, 'backend/src/services/priceProviders/lbma.js')}`);
-    spot = await lbmaProvider.getSpot();
-  } catch (err) {
-    console.log(`  FAIL  the provider could not produce a price: ${err.message}`);
-    process.exit(1);
-  }
+  // Nothing below can say anything without the feed. Guarded rather than
+  // exited, so the SKIP above leaves the process to end on its own.
+  if (rows !== null) {
+    let spot = null;
+    try {
+      const { lbmaProvider } = await import(
+        `file://${resolve(ROOT, 'backend/src/services/priceProviders/lbma.js')}`
+      );
+      spot = await lbmaProvider.getSpot();
+    } catch (err) {
+      console.log(`  FAIL  the provider could not produce a price: ${err.message}`);
+      process.exitCode = 1;
+    }
 
-  const { problems, notes } = checkFeed(rows, spot);
-  for (const n of notes) console.log(`  note  ${n.what}: ${n.detail}`);
-  for (const p of problems) console.log(`  FAIL  ${p.what}: ${p.detail}`);
+    if (spot !== null) {
+      const { problems, notes } = checkFeed(rows, spot);
+      for (const n of notes) console.log(`  note  ${n.what}: ${n.detail}`);
+      for (const p of problems) console.log(`  FAIL  ${p.what}: ${p.detail}`);
 
-  if (problems.length) {
-    console.log(`\n${problems.length} problem(s). The price feed is not what lbma.js assumes it is.`);
-    process.exitCode = 1;
-  } else {
-    console.log('\nThe LBMA feed still has the shape the provider reads, and the provider agrees with it.');
+      if (problems.length) {
+        console.log(`\n${problems.length} problem(s). The price feed is not what lbma.js assumes it is.`);
+        process.exitCode = 1;
+      } else {
+        console.log('\nThe LBMA feed still has the shape the provider reads, and the provider agrees with it.');
+      }
+    }
   }
 }

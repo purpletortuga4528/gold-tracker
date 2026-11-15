@@ -1,7 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 /**
- * Appearance state: colour theme and typeface.
+ * Appearance state: colour theme, contrast and typeface.
+ *
+ * Three, not two. This summary said "colour theme and typeface" and the
+ * comment in index.html named two of the three constants, both times leaving
+ * out contrast, which is the one a reader is then most likely to forget when
+ * changing either file.
  *
  * `theme` is what the user chose, and may be 'system'. `resolvedTheme` is the
  * concrete 'light' or 'dark' actually applied. Only the resolved value ever
@@ -9,8 +14,11 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
  * `prefers-color-scheme` query and there is one palette to keep correct rather
  * than two.
  *
- * The same keys are read by the boot script in index.html, which applies the
- * attributes before first paint. If you rename them, rename them there too.
+ * The same keys and allowlists are duplicated by the boot script in
+ * index.html, which applies the attributes before first paint. Rename or
+ * extend them here and they must change there too; check:docs compares the two
+ * files so a drift fails rather than showing up as a flash of the wrong
+ * appearance on somebody's next page load.
  */
 export const THEME_KEY = 'gold-tracker:theme';
 export const FONT_KEY = 'gold-tracker:font';

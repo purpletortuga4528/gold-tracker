@@ -213,3 +213,49 @@ describe('when the app has not been built', () => {
     }
   });
 });
+
+describe('when the app is rebuilt underneath a running server', () => {
+  test('the shell served names the bundle that exists now, not the one that did', async () => {
+    /*
+     * index.html used to be read once at startup and held. A rebuild renames
+     * the bundle, because the filename carries a content hash, so the held
+     * shell went on naming a file that had been deleted. The browser got the
+     * shell, requested a script that 404s, and rendered nothing: a blank page
+     * with the server reporting no error at all, because from its side both
+     * responses were correct.
+     *
+     * This is the failure that cost half an hour of the browser suite failing
+     * on "no table rows", with the cause in the server rather than the app.
+     */
+    const dir = await fakeDist();
+    const s = await serve({ dir });
+    try {
+      const before = await (await s.get('/countries')).text();
+      assert.match(before, /index-abc123\.js|Gold Tracker/, 'the original shell should be served');
+
+      // A rebuild: new bundle, and a shell naming it. The mtime has to differ
+      // from the first write for the change to be detectable at all, and a
+      // same-millisecond write is entirely possible on a fast filesystem.
+      await new Promise((r) => setTimeout(r, 12));
+      await rm(join(dir, 'assets', 'index-abc123.js'));
+      await writeFile(join(dir, 'assets', 'index-def456.js'), 'console.log("rebuilt")');
+      await writeFile(
+        join(dir, 'index.html'),
+        '<!doctype html><title>Gold Tracker</title><script src="/assets/index-def456.js"></script><div id="root"></div>',
+      );
+
+      const after = await (await s.get('/countries')).text();
+      assert.match(after, /index-def456\.js/, 'the rebuilt shell should be served');
+      assert.doesNotMatch(after, /index-abc123\.js/, 'and must not still name the deleted bundle');
+
+      // The point of the whole exercise: the script the shell names resolves.
+      const bundle = await s.get('/assets/index-def456.js');
+      assert.equal(bundle.status, 200, 'the bundle the shell names must exist');
+      const gone = await s.get('/assets/index-abc123.js');
+      assert.equal(gone.status, 404, 'and the old one is genuinely gone');
+    } finally {
+      await s.stop();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});

@@ -1,5 +1,5 @@
 import express from 'express';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -88,7 +88,41 @@ export function serveFrontend(app, { dir = DIST } = {}) {
     return { serving: false, dir };
   }
 
-  const indexHtml = readFileSync(join(dir, 'index.html'), 'utf8');
+  /*
+   * index.html is re-read when it changes on disk, rather than held from
+   * startup.
+   *
+   * Holding it meant that rebuilding while the server ran left it serving the
+   * previous shell, which names the previous bundle by its fingerprinted
+   * filename. That file is gone after a rebuild, so the browser got the app
+   * shell, asked for a script that 404s, and rendered nothing: a blank page,
+   * no error anywhere on the server, and a stale document it had read once and
+   * never checked again. It cost a confusing half hour of the browser suite
+   * failing on "no table rows" before the cause turned out to be the server,
+   * not the app.
+   *
+   * A stat per navigation is nothing next to the 180 kB bundle the same page
+   * load fetches, and it removes the whole class of problem rather than
+   * documenting it.
+   */
+  const indexPath = join(dir, 'index.html');
+  let cached = { mtimeMs: -1, html: '' };
+
+  const readIndex = () => {
+    try {
+      const { mtimeMs } = statSync(indexPath);
+      if (mtimeMs !== cached.mtimeMs) {
+        cached = { mtimeMs, html: readFileSync(indexPath, 'utf8') };
+      }
+    } catch {
+      // Removed or unreadable mid-flight. Whatever was last read is a better
+      // answer than a crash, and the 503 branch above covers a missing build
+      // at startup.
+    }
+    return cached.html;
+  };
+
+  readIndex();
 
   app.use(appHeaders);
 
@@ -118,7 +152,7 @@ export function serveFrontend(app, { dir = DIST } = {}) {
 
   app.get(/^\/(?!api\/).*/, (req, res, next) => {
     if (looksLikeAFile(req.path)) return next();
-    res.type('html').set('Cache-Control', 'no-cache').send(indexHtml);
+    res.type('html').set('Cache-Control', 'no-cache').send(readIndex());
   });
 
   return { serving: true, dir };

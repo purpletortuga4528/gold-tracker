@@ -364,3 +364,49 @@ test('normalising the path leaves the query string alone', async () => {
     await s.stop();
   }
 });
+
+test('an absolute-form request target is refused, not half-routed', async () => {
+  // `GET http://host/api/reserves HTTP/1.1` is legal and meant for proxies.
+  // This server never proxies, so nothing legitimate sends it one. Rewriting
+  // req.url to the pathname was not enough: Express matches a mount against
+  // the parsed pathname and then strips the prefix by slicing the raw url, so
+  // it came out as `http://host/api` and fell through to the app shell with a
+  // 200. Rate limited and carrying no API data, but a request the router
+  // mishandles should not be answered 200 at all.
+  const { createApp } = await import('../src/app.js');
+  const net = await import('node:net');
+
+  const server = createApp().listen(0);
+  await new Promise((r) => server.once('listening', r));
+  const { port } = server.address();
+
+  const raw = (line) =>
+    new Promise((resolve) => {
+      const socket = net.connect(port, '127.0.0.1', () =>
+        socket.write(`${line}\r\nHost: h\r\nConnection: close\r\n\r\n`),
+      );
+      let buf = '';
+      socket.on('data', (d) => (buf += d));
+      socket.on('end', () => resolve(buf));
+      socket.on('error', () => resolve(''));
+    });
+
+  try {
+    for (const form of [
+      `GET http://127.0.0.1:${port}/api/reserves HTTP/1.1`,
+      `GET http://127.0.0.1:${port}//api/reserves HTTP/1.1`,
+    ]) {
+      const res = await raw(form);
+      assert.match(res.split('\r\n')[0], /400/, `${form} should be refused`);
+      assert.match(res, /Absolute-form/, 'and should say why');
+      assert.doesNotMatch(res, /<!doctype html>/i, 'never the app shell');
+    }
+
+    // The ordinary forms are untouched by that refusal.
+    const ok = await raw('GET /api/reserves?limit=1 HTTP/1.1');
+    assert.match(ok.split('\r\n')[0], /200/);
+    assert.match(ok, /application\/json/i);
+  } finally {
+    await new Promise((r) => server.close(r));
+  }
+});

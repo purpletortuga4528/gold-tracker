@@ -36,12 +36,51 @@ export function createApp() {
    * The query string is left exactly as sent: slashes are meaningful inside it
    * and collapsing them would corrupt a value somebody passed.
    */
-  app.use((req, _res, next) => {
-    const queryAt = req.url.indexOf('?');
-    const path = queryAt === -1 ? req.url : req.url.slice(0, queryAt);
-    const query = queryAt === -1 ? '' : req.url.slice(queryAt);
-    if (path.includes('//')) req.url = path.replace(/\/{2,}/g, '/') + query;
-    next();
+  app.use((req, res, next) => {
+    // OPTIONS * is a request about the server, not a path. Left alone.
+    if (req.url === '*') return next();
+
+    /*
+     * Parsed rather than string-sliced, because a request line can be
+     * absolute-form: `GET http://host//api/reserves HTTP/1.1` is legal, Node
+     * passes it through untouched, and the first version of this took a
+     * substring and collapsed the `//` in the scheme instead of the path. That
+     * left the original hole open by a second route, which is worse than not
+     * having tried: the fix read as though it closed it.
+     *
+     * The placeholder base is only there to let an origin-form URL parse. It
+     * is discarded: nothing but the pathname and the query is kept, so an
+     * absolute-form request cannot smuggle a host through either.
+     */
+    if (req.url.startsWith('/')) {
+      // Origin-form, which is what every normal client sends. Split by hand:
+      // `new URL('//api/x', base)` reads a leading `//` as protocol-relative
+      // and returns host "api" with pathname "/x", which silently drops the
+      // very segment this is here to preserve.
+      const queryAt = req.url.indexOf('?');
+      const path = queryAt === -1 ? req.url : req.url.slice(0, queryAt);
+      const query = queryAt === -1 ? '' : req.url.slice(queryAt);
+      req.url = path.replace(/\/{2,}/g, '/') + query;
+      return next();
+    }
+
+    /*
+     * Absolute-form, refused rather than rewritten.
+     *
+     * `GET http://host/api/reserves HTTP/1.1` is legal and is meant for
+     * proxies. This is an origin server and never proxies anything, so nothing
+     * legitimate sends it one. Rewriting req.url to the pathname is not enough
+     * either: Express matches a mount against the parsed pathname but then
+     * strips the prefix by slicing the raw url string, so an absolute-form
+     * request came out the other side as `http://host/api` and fell through to
+     * the app shell. It was rate limited, and it carried no API data, but a
+     * request arriving in a form the router mishandles should not be answered
+     * 200 at all.
+     *
+     * 400 is the honest answer: the request is well formed and this server
+     * will not serve it.
+     */
+    res.status(400).json({ error: 'Absolute-form request targets are not accepted' });
   });
 
   const allowAny = config.corsOrigins.includes('*');

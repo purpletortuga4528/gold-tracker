@@ -335,11 +335,19 @@ for (const [name, text] of [['README.md', readme], ['data/README.md', dataReadme
     frontend: scriptsIn('frontend/package.json'),
   };
 
+  /*
+   * Every one of these must exist. An earlier version skipped a file it could
+   * not read, which meant deleting NOTICE.md outright left this reporting that
+   * all claims hold: the licence notice for somebody else's data, gone, and
+   * the checker satisfied. "Not there" is the most complete way for a document
+   * to be wrong.
+   */
   const docFiles = [
     'README.md',
     'backend/data/README.md',
     'backend/src/services/priceProviders/README.md',
     'NOTICE.md',
+    'LICENSE',
     'backend/.env.example',
     'Dockerfile',
     'deploy/gold-tracker.service',
@@ -353,7 +361,8 @@ for (const [name, text] of [['README.md', readme], ['data/README.md', dataReadme
     let text;
     try {
       text = read(file);
-    } catch {
+    } catch (err) {
+      broken.push(`${file} is missing: ${err.code ?? err.message}`);
       continue;
     }
 
@@ -386,7 +395,7 @@ for (const [name, text] of [['README.md', readme], ['data/README.md', dataReadme
  * a browser with something already in localStorage, which is the hardest case
  * to notice and the one no unit test sees.
  */
-{
+try {
   const html = read('frontend/index.html');
   const theme = read('frontend/src/lib/useTheme.jsx');
 
@@ -410,6 +419,11 @@ for (const [name, text] of [['README.md', readme], ['data/README.md', dataReadme
 
   if (drifted.length) bad('index.html boot script matches useTheme.jsx', drifted.join('; '));
   else ok(`index.html boot script matches useTheme.jsx (${pairs.length} keys and lists)`);
+} catch (err) {
+  // Reported, not thrown. An unreadable input made this whole script die with
+  // an ENOENT stack trace, which is the least useful thing a checker can do:
+  // the point of it is to name the claim it could not stand behind.
+  bad('index.html boot script matches useTheme.jsx', `could not be read: ${err.message}`);
 }
 
 // --- No component names a benchmark ------------------------------------

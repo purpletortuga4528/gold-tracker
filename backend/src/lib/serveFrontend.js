@@ -152,7 +152,15 @@ export function serveFrontend(app, { dir = DIST } = {}) {
 
   app.get(/^\/(?!api\/).*/, (req, res, next) => {
     if (looksLikeAFile(req.path)) return next();
-    res.type('html').set('Cache-Control', 'no-cache').send(readIndex());
+
+    const html = readIndex();
+    // Empty only if the very first read failed, in the gap between the
+    // distExists check above and the read below. Narrow, but an empty 200 is
+    // the worst available answer: a blank page that claims to have worked. The
+    // same page a never-built checkout gets is the honest one.
+    if (!html) return res.status(503).type('html').send(NOT_BUILT);
+
+    res.type('html').set('Cache-Control', 'no-cache').send(html);
   });
 
   return { serving: true, dir };

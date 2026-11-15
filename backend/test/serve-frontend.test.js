@@ -259,3 +259,33 @@ describe('when the app is rebuilt underneath a running server', () => {
     }
   });
 });
+
+test('an unreadable shell is a 503, never an empty 200', async () => {
+  // The gap between the distExists check and the first read. An empty 200 is
+  // a blank page that claims to have worked, which is the one answer worse
+  // than either honest alternative.
+  const dir = await fakeDist();
+  const s = await serve({ dir });
+  try {
+    // Prove the normal path first, so a broken fixture cannot make this pass.
+    assert.equal((await s.get('/countries')).status, 200);
+
+    // Now make it unreadable and change the mtime, so the cache is invalidated
+    // and the re-read fails.
+    await rm(join(dir, 'index.html'));
+    await new Promise((r) => setTimeout(r, 12));
+    const res = await s.get('/countries');
+
+    // Either answer is defensible: the last good shell, or the not-built page.
+    // What it must never be is 200 with nothing in it.
+    const body = await res.text();
+    assert.ok(body.length > 0, 'the response body must not be empty');
+    assert.ok(
+      res.status === 200 || res.status === 503,
+      `expected 200 with the last good shell or 503, got ${res.status}`,
+    );
+  } finally {
+    await s.stop();
+    await rm(dir, { recursive: true, force: true });
+  }
+});

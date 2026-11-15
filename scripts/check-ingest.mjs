@@ -69,14 +69,34 @@ if (!Array.isArray(after.countries) || after.countries.length === 0) {
 {
   const wasCount = before.meta.countryCount;
   const nowCount = after.meta.countryCount;
-  const drop = wasCount - nowCount;
+  const moved = nowCount - wasCount;
+  const limit = Math.max(3, wasCount * 0.1);
+
+  /*
+   * Judged in both directions, which it was not.
+   *
+   * It failed only on a sharp drop, on the reasoning that reporters join the
+   * template or file late. True, but a sharp rise is not ordinary either, and
+   * it means something worse: the classification picked up rows it should not
+   * have. The aggregate and institution rows exist precisely because the Euro
+   * Area and the ECB must not be counted as countries, and a sector-selection
+   * regression that swept them in would have raised this count and been
+   * reported as a note.
+   */
   if (nowCount === 0) fail('country count is zero', 'nothing was classified as a country');
-  else if (drop > Math.max(3, wasCount * 0.1)) {
-    fail('country count fell sharply', `${wasCount} to ${nowCount}, a drop of ${drop}`);
-  } else if (drop !== 0) {
-    note('country count changed', `${wasCount} to ${nowCount}`);
+  else if (-moved > limit) {
+    fail('reporting-economy count fell sharply', `${wasCount} to ${nowCount}, a drop of ${-moved}`);
+  } else if (moved > limit) {
+    fail(
+      'reporting-economy count rose sharply',
+      `${wasCount} to ${nowCount}, a rise of ${moved}. Reporters do join the template, but a jump ` +
+        'this size more likely means the classification swept in rows that are not countries. ' +
+        'Check meta.entryCount against countryCount and look at what kind each new row was given.',
+    );
+  } else if (moved !== 0) {
+    note('reporting-economy count changed', `${wasCount} to ${nowCount}`);
   } else {
-    note('country count', `${nowCount}, unchanged`);
+    note('reporting-economy count', `${nowCount}, unchanged`);
   }
 }
 
@@ -185,5 +205,9 @@ if (problems.length) {
   console.log(`\n${problems.length} problem(s). The ingest produced something that should not be published.`);
   process.exitCode = 1;
 } else {
-  console.log(`\nThe ingest still produces a sound snapshot. ${after.meta.countryCount} countries, newest figure ${after.meta.latestAsOfDate}.`);
+  // "reporting economies", not countries: two of them are Hong Kong SAR and
+  // West Bank and Gaza, and this line was repeating what the README used to.
+  console.log(
+    `\nThe ingest still produces a sound snapshot. ${after.meta.countryCount} reporting economies, newest figure ${after.meta.latestAsOfDate}.`,
+  );
 }

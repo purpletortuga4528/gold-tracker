@@ -376,6 +376,41 @@ for (const [key, actual] of [
   else ok(`dash policy (${scanned} files)`);
 }
 
+// --- dev.mjs runs the same thing the package script does -------------------
+/*
+ * dev.mjs launches both servers as `node <script>` rather than through npm,
+ * because going through npm on Windows means spawning npm.cmd, which needs
+ * shell: true, which Node deprecates. Its own comment names the trade-off:
+ * "the paths below have to stay in step with the `dev` script in each
+ * package.json". Nothing kept them in step.
+ *
+ * The backend half is mechanically checkable, and it is the one likely to
+ * drift: an added --env-file or a moved entry point would leave `npm run dev`
+ * silently running something other than `npm run dev --prefix backend`. The
+ * frontend half is vite's bin path against the bare word "vite", which is
+ * equivalent rather than equal, so it is not compared here.
+ */
+{
+  const devScript = JSON.parse(read('backend/package.json')).scripts?.dev;
+  const devRunner = read('scripts/dev.mjs');
+
+  // The args array in the api target, e.g. ['--watch', 'src/index.js'].
+  const apiBlock = devRunner.slice(devRunner.indexOf("name: 'api'"));
+  const argsMatch = /args: \[([^\]]+)\]/.exec(apiBlock);
+
+  if (!devScript) bad('dev.mjs matches the backend dev script', 'backend/package.json has no dev script');
+  else if (!argsMatch) bad('dev.mjs matches the backend dev script', 'could not find the api args in dev.mjs');
+  else {
+    const fromRunner = `node ${argsMatch[1]
+      .split(',')
+      .map((s) => s.trim().replace(/^['"]|['"]$/g, ''))
+      .join(' ')}`;
+    if (fromRunner !== devScript) {
+      bad('dev.mjs matches the backend dev script', `dev.mjs runs "${fromRunner}", package.json says "${devScript}"`);
+    } else ok(`dev.mjs matches the backend dev script ("${devScript}")`);
+  }
+}
+
 // --- Every command the docs tell you to run exists -------------------------
 /*
  * A named script that is not there is the first thing a new reader hits, and

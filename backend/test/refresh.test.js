@@ -280,3 +280,87 @@ describe('the interval itself', () => {
     assert.equal(intervalToMs(0.0001), FLOOR, 'sub-minute intervals are floored');
   });
 });
+
+describe('when there is no price reference', () => {
+  const noPrice = () => {
+    const err = new Error('build-reserves exited 3: the price reference is unavailable');
+    err.exitCode = 3;
+    return Promise.reject(err);
+  };
+
+  test('it says so once and does not try again the same day', async () => {
+    // The ingest fetches the IMF before the price, so each attempt costs three
+    // large SDMX downloads that are then thrown away. On the shipped six hour
+    // interval that is four pointless round trips a day from every self-hosted
+    // copy, for as long as the feed stays shut.
+    let runs = 0;
+    const log = recorder();
+    const scheduler = startAutoRefresh({
+      minAgeHours: 0,
+      freshness: snapshotAged(99),
+      run: () => {
+        runs += 1;
+        return noPrice();
+      },
+      log,
+    });
+    try {
+      await idle(scheduler);
+      assert.equal(runs, 1, 'the first attempt should happen');
+
+      const second = await scheduler.refreshNow();
+      assert.equal(runs, 1, 'the second must not spend another three downloads');
+      assert.match(second.skipped, /waiting a day/);
+    } finally {
+      scheduler.stop();
+    }
+  });
+
+  test('it is reported as its own condition, not as a broken pipeline', async () => {
+    const log = recorder();
+    const scheduler = startAutoRefresh({
+      minAgeHours: 0,
+      freshness: snapshotAged(99),
+      run: noPrice,
+      log,
+    });
+    try {
+      await idle(scheduler);
+      const status = scheduler.status();
+      assert.equal(status.lastResult.ok, false);
+      assert.equal(status.lastResult.noPriceReference, true);
+      // Said in its own words, rather than as a generic rebuild failure.
+      assert.ok(
+        log.lines.some((m) => /no price reference/i.test(m)),
+        'it should say the reference was missing',
+      );
+      assert.ok(
+        !log.lines.some((m) => /rebuild failed/i.test(m)),
+        'and must not report it as a broken rebuild',
+      );
+    } finally {
+      scheduler.stop();
+    }
+  });
+
+  test('an ordinary failure still retries on the normal cadence', async () => {
+    // The backoff is for "could not try", not for "tried and broke".
+    let runs = 0;
+    const scheduler = startAutoRefresh({
+      minAgeHours: 0,
+      freshness: snapshotAged(99),
+      run: () => {
+        runs += 1;
+        return Promise.reject(new Error('build-reserves exited 1: something broke'));
+      },
+      log: recorder(),
+    });
+    try {
+      await idle(scheduler);
+      await scheduler.refreshNow();
+      assert.equal(runs, 2, 'a real failure must not be backed off');
+    } finally {
+      scheduler.stop();
+    }
+  });
+});

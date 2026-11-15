@@ -72,8 +72,31 @@ export function startAutoRefresh({
   let lastAttempt = null;
   let lastResult = null;
 
+  /*
+   * When the price reference was last found missing.
+   *
+   * The ingest fetches the IMF before the price, deliberately, so that a shape
+   * change upstream is still caught when the price feed happens to be down.
+   * The cost is that an instance with no usable price provider downloads three
+   * large SDMX payloads on every tick and throws them all away. On the shipped
+   * six hour interval that is four pointless round trips a day, from every
+   * self-hosted copy, for as long as the feed stays shut. The IMF is not
+   * charging for that, which is not a reason to spend it.
+   *
+   * A closed feed does not reopen within hours, so after one such failure the
+   * next attempt waits a day. It still retries, because a key being added or a
+   * feed reopening should be picked up without anyone restarting the process.
+   */
+  let noPriceSince = null;
+  const NO_PRICE_BACKOFF_MS = 24 * HOUR;
+
   async function maybeRefresh(reason) {
     if (running) return { skipped: 'a refresh is already running' };
+
+    if (noPriceSince !== null && now() - noPriceSince < NO_PRICE_BACKOFF_MS) {
+      const hours = Math.round((now() - noPriceSince) / HOUR);
+      return { skipped: `no price reference ${hours}h ago; waiting a day before trying again` };
+    }
 
     // Claimed synchronously, in the same tick as the check above. An earlier
     // version set this only just before spawning, after awaiting the freshness
@@ -101,6 +124,8 @@ export function startAutoRefresh({
       log.log?.(`[refresh] rebuilding the reserves snapshot (${reason})`);
 
       await run();
+      // A run that got all the way through means whatever was missing is back.
+      noPriceSince = null;
       // The dataset is cached in memory, so a rebuilt file is not served until
       // the cache is dropped.
       clearReservesCache();
@@ -113,6 +138,21 @@ export function startAutoRefresh({
       // still being served; a failed refresh is a stale-data problem, not an
       // outage, and the freshness banner already reports stale data.
       lastResult = { ok: false, at: new Date(now()).toISOString(), error: err.message };
+
+      if (err.exitCode === 3) {
+        // Not a failure of this code or of the IMF: there was no price to
+        // judge filings against, so nothing was attempted. Said once, at a
+        // level that matches, and then left alone for a day.
+        noPriceSince = now();
+        lastResult.noPriceReference = true;
+        log.warn?.(
+          '[refresh] no price reference, so the snapshot was not rebuilt. ' +
+            'Not retrying for 24h. Set a working PRICE_PROVIDER to resume:',
+          err.message,
+        );
+        return lastResult;
+      }
+
       log.error?.('[refresh] rebuild failed, keeping the existing snapshot:', err.message);
       return lastResult;
     } finally {
@@ -165,8 +205,15 @@ function runBuild() {
     });
     child.on('exit', (code) => {
       clearTimeout(timeout);
-      if (code === 0) resolvePromise();
-      else reject(new Error(`build-reserves exited ${code}${stderr ? `: ${stderr.trim().slice(0, 300)}` : ''}`));
+      if (code === 0) return resolvePromise();
+      const failure = new Error(
+        `build-reserves exited ${code}${stderr ? `: ${stderr.trim().slice(0, 300)}` : ''}`,
+      );
+      // 3 means it could not even try: there was no price reference, so unit
+      // detection could not run. Carried through so the scheduler can back off
+      // rather than repeat a download it is only going to throw away.
+      failure.exitCode = code;
+      reject(failure);
     });
   });
 }

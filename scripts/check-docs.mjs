@@ -314,6 +314,69 @@ for (const [name, text] of [['README.md', readme], ['data/README.md', dataReadme
   else ok(`${name} dash policy`);
 }
 
+// --- Every command the docs tell you to run exists -------------------------
+/*
+ * A named script that is not there is the first thing a new reader hits, and
+ * nothing else here would notice it going missing. Four documents told people
+ * to run `npm run verify:provider`, and two told them `npm run
+ * check:freshness`, neither of which existed outside backend/package.json: a
+ * reader following any of those from the repository root got "Missing script".
+ * The README even contradicted itself, writing the prefixed form in its
+ * command list and the bare form in its prose.
+ *
+ * Checked against the manifests rather than by running anything, so this stays
+ * part of the static half.
+ */
+{
+  const scriptsIn = (manifest) => Object.keys(JSON.parse(read(manifest)).scripts ?? {});
+  const packages = {
+    '': scriptsIn('package.json'),
+    backend: scriptsIn('backend/package.json'),
+    frontend: scriptsIn('frontend/package.json'),
+  };
+
+  const docFiles = [
+    'README.md',
+    'backend/data/README.md',
+    'backend/src/services/priceProviders/README.md',
+    'NOTICE.md',
+    'backend/.env.example',
+    'Dockerfile',
+    'deploy/gold-tracker.service',
+    '.github/workflows/ci.yml',
+  ];
+
+  const broken = [];
+  let checked = 0;
+
+  for (const file of docFiles) {
+    let text;
+    try {
+      text = read(file);
+    } catch {
+      continue;
+    }
+
+    /*
+     * The script name may carry a colon and a hyphen, which is why this is not
+     * `[a-z:]+`: that pattern read `check:price-feed` as `check:price` and
+     * reported a script that exists as missing. An optional `-- <args>` run
+     * may sit between the name and a `--prefix`.
+     */
+    for (const m of text.matchAll(/npm run ([a-z][a-z:-]*[a-z])(?:\s+--\s+[^\n`|]*?)?(?:\s+--prefix\s+(\w+))?(?=[\s`.,)]|$)/g)) {
+      const [, script, prefix = ''] = m;
+      const where = packages[prefix];
+      const label = `npm run ${script}${prefix ? ` --prefix ${prefix}` : ''}`;
+      checked += 1;
+      if (!where) broken.push(`${file}: unknown prefix in ${label}`);
+      else if (!where.includes(script)) broken.push(`${file}: ${label} does not exist`);
+    }
+  }
+
+  if (broken.length) bad('every documented command exists', [...new Set(broken)].join('; '));
+  else ok(`every documented command exists (${checked} mentions across ${docFiles.length} files)`);
+}
+
 // --- The pre-paint boot script agrees with the React side -----------------
 /*
  * index.html resolves the saved appearance before first paint, which means it

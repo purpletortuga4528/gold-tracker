@@ -173,13 +173,38 @@ describe('when the rebuild fails', () => {
 
 describe('lifecycle', () => {
   test('the interval does not hold the process open', () => {
-    // An un-unref'd timer makes the server unkillable between ticks and hangs
-    // the test runner.
-    const scheduler = startAutoRefresh({ minAgeHours: 999_999, run: async () => {}, log: recorder() });
+    /*
+     * An un-unref'd timer makes the server unkillable between ticks and hangs
+     * the test runner.
+     *
+     * This asserted `timers === 0 || true`, which is always true: the test
+     * could not fail, while its name claimed to verify the one thing it was
+     * added for. It counted Timeout handles from getActiveResourcesInfo, which
+     * is a reading that varies by Node version and by whatever else the runner
+     * happens to have open, so presumably it failed once and was disjoined
+     * with `true` rather than replaced.
+     *
+     * The handle is injected instead, and the assertion is that unref was
+     * called on it. That is the actual contract, it holds on every supported
+     * version, and nothing else in the process can affect it.
+     */
+    let unrefCalled = 0;
+    const handle = {
+      unref() {
+        unrefCalled += 1;
+        return this;
+      },
+    };
+
+    const scheduler = startAutoRefresh({
+      minAgeHours: 999_999,
+      run: async () => {},
+      log: recorder(),
+      setIntervalFn: () => handle,
+      clearIntervalFn: () => {},
+    });
     try {
-      const handles = process.getActiveResourcesInfo?.() ?? [];
-      const timers = handles.filter((h) => h === 'Timeout').length;
-      assert.ok(timers === 0 || true, 'unref means this timer is not counted as keeping the loop alive');
+      assert.equal(unrefCalled, 1, 'the scheduler must unref the interval it creates');
     } finally {
       scheduler.stop();
     }

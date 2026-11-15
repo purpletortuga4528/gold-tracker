@@ -41,7 +41,13 @@ export function getProvider(id = config.priceProvider) {
  *
  * A metered provider bills one call per day of history, and the chart asks for
  * years, so any provider that does not declare supportsHistory falls back to
- * LBMA, which is free and goes back to 1968.
+ * LBMA.
+ *
+ * That fallback was free and went back to 1968. It is now shut, so this
+ * returns a provider that will throw, and the chart card reports it. Kept
+ * rather than removed: the arrangement is right the moment anyone can reach
+ * the feed again, and the alternative is charging a metered provider for a
+ * decade of history one day at a time.
  */
 export function getHistoryProvider() {
   const selected = getProvider();

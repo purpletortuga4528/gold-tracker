@@ -28,7 +28,7 @@ export const exampleProvider = {
   id: 'example',                    // matches PRICE_PROVIDER
   label: 'Example Metals API',
   requiresKey: true,
-  supportsHistory: false,           // false means charts fall back to LBMA
+  supportsHistory: false,           // false falls back to lbma.js, which is shut
   verified: false,                  // until you have actually run it
   description: 'One line, shown at /api/price/providers.',
 
@@ -81,9 +81,16 @@ back to one of those returns a number, in the right type, in the right range,
 that is silently wrong by a factor of 31 or more.
 
 **Do not implement `getHistory` per date.** Providers that charge per call bill
-one request per day of history, and the chart asks for years. Leave
-`supportsHistory: false` and the app uses LBMA for charts, which is free and
-goes back to 1968.
+one request per day of history, and the chart asks for years.
+
+This used to say: leave `supportsHistory: false` and the app uses LBMA for
+charts, which is free and goes back to 1968. That advice is dead. LBMA is the
+fallback in `getHistoryProvider()` and the fallback now always fails, so
+`supportsHistory: false` means no chart at all rather than a free one. If your
+provider can serve a range in one request, implement `getHistory` and say so.
+If it can only be billed per day, leave the flag false and accept that the
+chart card will show the fallback's error, which is honest and is all that is
+left.
 
 ## Checking it
 
@@ -98,11 +105,15 @@ Only set `verified: true` once you have seen that output.
 
 ## Keys stay on the server
 
-Nothing here needs a key today, so there is no key handling in `config.js` to
-copy. If you add a provider that needs one, read it from `process.env` in
-`config.js` and use it only in this directory. It must never reach a `VITE_`
-variable: everything under that prefix is compiled into the bundle the browser
-downloads.
+`metalsdev.js` is the pattern to copy. Its key is read once in `config.js`
+(`metalsDevKey`, from `METALS_DEV_API_KEY`) and used only in this directory. Do
+the same: read it from `process.env` in `config.js`, never anywhere else. It
+must never reach a `VITE_` variable, because everything under that prefix is
+compiled into the bundle the browser downloads.
+
+metals.dev passes its key as a query parameter rather than a header, which is
+why that adapter never logs a URL. If yours does the same, keep the URL out of
+every log line and every thrown error.
 
 The frontend never calls a provider directly, so it has no reason to hold a
 key. Keep it that way, and keep the key out of thrown errors: a provider's own

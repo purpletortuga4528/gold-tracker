@@ -1,9 +1,10 @@
 /**
  * Generated prices, for demonstrating the app without a working price feed.
  *
- * Why this exists. The LBMA feed went behind a Cloudflare challenge and now
- * answers 403 to anything that is not a browser, which leaves the only
- * provider that ships unable to return a number. Everything downstream of a
+ * Why this exists. The LBMA feed went behind Cloudflare and now answers 401 at
+ * the root and 403 on every path, to browsers exactly as to scripts, which
+ * leaves the only keyless provider that ships unable to return a number. There
+ * is no "open it by hand" around it. Everything downstream of a
  * price goes dark with it: the headline, the chart, every dollar valuation and
  * the share of reserves. That is correct behaviour and it is useless for
  * showing somebody what the app does.

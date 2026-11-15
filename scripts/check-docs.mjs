@@ -229,6 +229,67 @@ for (const [name, text] of [['README.md', readme], ['data/README.md', dataReadme
   else ok(`${name} dash policy`);
 }
 
+// --- No component names a benchmark in a literal --------------------------
+/*
+ * The chart's tooltip used to read "LBMA PM fix" from a string literal, for
+ * every provider. Under PRICE_PROVIDER=demo that put a real benchmark's name
+ * on invented numbers, and under metals.dev it called that provider's generic
+ * spot series the PM auction result.
+ *
+ * What makes this worth a standing check rather than a one-off fix is that the
+ * backend already defended it. demo-provider.test.js asserts the demo
+ * provider's own `benchmark` field never says LBMA; the frontend simply did
+ * not read the field that assertion protects. A guarantee the UI can bypass
+ * with a literal is not a guarantee, and the next component to label a series
+ * would bypass it the same way.
+ *
+ * Provider modules are exempt: naming the benchmark is their job.
+ */
+{
+  const components = execFileSync(
+    process.execPath,
+    [
+      '-e',
+      `const {readdirSync,statSync}=require('fs'),{join}=require('path');
+       const out=[];(function walk(d){for(const e of readdirSync(d)){const p=join(d,e);
+       if(statSync(p).isDirectory())walk(p);else if(/\\.jsx?$/.test(e)&&!/\\.test\\./.test(e))out.push(p);}})(process.argv[1]);
+       console.log(out.join('\\n'));`,
+      resolve(ROOT, 'frontend/src'),
+    ],
+    { encoding: 'utf8' },
+  )
+    .split('\n')
+    .filter(Boolean);
+
+  /*
+   * Comments are blanked before scanning, because explaining this rule means
+   * quoting the string it forbids. Done across the whole file rather than per
+   * line, since a JSX `{/* ... *\/}` block spans lines and its continuation
+   * lines look like ordinary code. Newlines are preserved so the line numbers
+   * reported below are the real ones.
+   */
+  const stripComments = (text) =>
+    text
+      .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+      .replace(/\/\/[^\n]*/g, (m) => ' '.repeat(m.length));
+
+  const offenders = [];
+  for (const file of components) {
+    const code = stripComments(readFileSync(file, 'utf8'));
+    for (const [i, line] of code.split('\n').entries()) {
+      if (/['"`][^'"`]*\bLBMA\b[^'"`]*['"`]/.test(line)) {
+        offenders.push(`${file.slice(ROOT.length + 1).replace(/\\/g, '/')}:${i + 1}`);
+      }
+    }
+  }
+
+  if (offenders.length) {
+    bad('no frontend literal names a benchmark', `${offenders.join(', ')} should read it from the response`);
+  } else {
+    ok(`no frontend literal names a benchmark (${components.length} files scanned)`);
+  }
+}
+
 // --- Test counts quoted in the README, only when asked ---------------------
 // Opt-in because it runs both suites, which takes about fifteen seconds. It
 // earns that: the README said 50 backend tests when there were 71, which is

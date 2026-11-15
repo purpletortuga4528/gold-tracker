@@ -135,8 +135,13 @@ writes `backend/data/gold-reserves.json` (85 countries, monthly figures back to
 2010).
 
 This replaces the "download a spreadsheet from the World Gold Council by hand"
-approach: the snapshot is reproducible from a single command, and every figure
-is traceable to a query URL recorded in the file's own metadata.
+approach: every figure is traceable to a query URL recorded in the file's own
+metadata, and the snapshot is reproducible from a single command **given a
+working price provider**. That caveat is new and it is not a footnote:
+`build:data` needs a price to run unit detection against, so with the default
+provider now closed it exits 3 and writes nothing. The committed snapshot is
+what the app serves until a provider is configured. See
+[the price feed closed](#the-price-feed-closed).
 
 The dataset has real quirks, all handled in the ingest and all documented in
 [backend/data/README.md](backend/data/README.md): duplicate series per economy,
@@ -226,12 +231,11 @@ Keys stay server side. The frontend never calls a provider and never sees a key.
 
 ### Showing the app without a price feed
 
-In October 2026 the LBMA feed went behind a Cloudflare challenge and began
-answering 403 to anything that is not a browser. The app degrades honestly when
-that happens: reserve tonnages are unaffected because they do not depend on a
-price, and the headline, the chart, the dollar values and the share column say
-so rather than guessing. That is the right behaviour and it is useless for
-showing somebody what the app does.
+With the benchmark withdrawn, as above, the app degrades honestly: reserve
+tonnages are unaffected because they do not depend on a price, and the
+headline, the chart, the dollar values and the share column say so rather than
+guessing. That is the right behaviour and it is useless for showing somebody
+what the app does.
 
 So there is a second provider, and it is not a data source:
 

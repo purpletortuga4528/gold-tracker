@@ -85,8 +85,15 @@ export function PriceChart() {
                   domain={['auto', 'auto']}
                   tickFormatter={(v) => `$${Math.round(v).toLocaleString('en-US')}`}
                 />
+                {/* The series name is read from the response, not hard-coded.
+                    It said "LBMA PM fix" whatever was serving: under
+                    PRICE_PROVIDER=demo that put a named benchmark on invented
+                    numbers, and under metals.dev it called that provider's
+                    generic spot series the PM auction result, which it is not.
+                    Every provider's getHistory already reports what its own
+                    series is, so the tooltip asks rather than assumes. */}
                 <Tooltip
-                  formatter={(v) => [formatPrice(v), 'LBMA PM fix']}
+                  formatter={(v) => [formatPrice(v), data?.benchmark ?? 'Gold price']}
                   labelFormatter={formatDate}
                   contentStyle={{
                     borderRadius: 8,

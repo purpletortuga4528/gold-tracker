@@ -91,7 +91,7 @@ export function createApp() {
    *
    * This is not a micro-optimisation. `/api/price/history?range=max` is 694 kB
    * of JSON and the app bundle is 624 kB, and both were going out whole. They
-   * are 74 kB and 180 kB compressed. It is the single largest thing this
+   * are 83 kB and 180 kB compressed. It is the single largest thing this
    * server does to anybody's connection.
    *
    * On BREACH, which is the reason to think before turning this on: the attack

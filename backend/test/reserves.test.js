@@ -60,3 +60,42 @@ test('meta carries provenance and the region list', async () => {
   assert.ok(meta.regions.includes('Europe'));
   assert.ok(meta.latestAsOfDate >= '2026-01-31');
 });
+
+test('a name spelled with a diacritic is findable without typing it', async () => {
+  /*
+   * The IMF spells one reporter "Türkiye, Republic of". Plain lowercasing meant
+   * searching "Turkiye" returned nothing: the row was reachable only by typing
+   * the umlaut or by its ISO code, and it is a top ten holder and about the
+   * most likely name anyone would type.
+   *
+   * Written against whatever the dataset actually holds rather than against
+   * TUR by name, so this keeps testing the behaviour if the IMF respells that
+   * reporter or accents another one.
+   */
+  const { countries } = await listReserves({ kind: 'all' });
+  const accented = countries.filter((c) => /[^\x00-\x7F]/.test(c.countryName));
+  assert.ok(accented.length > 0, 'the dataset should still contain an accented name to test with');
+
+  for (const row of accented) {
+    const asFiled = row.countryName.split(',')[0].trim();
+    const asTyped = asFiled.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    assert.notEqual(asTyped, asFiled, `${row.countryCode} should differ once folded`);
+
+    for (const query of [asFiled, asTyped, asTyped.toLowerCase(), asTyped.toUpperCase()]) {
+      const hits = (await listReserves({ kind: 'all', search: query })).countries;
+      assert.ok(
+        hits.some((c) => c.countryCode === row.countryCode),
+        `searching ${JSON.stringify(query)} should find ${row.countryCode}`,
+      );
+    }
+  }
+});
+
+test('folding does not make the search match everything', async () => {
+  // A fold that returned '' or swallowed the query would pass the test above
+  // while making search useless, which is the failure worth guarding.
+  const { total } = await listReserves({ kind: 'all' });
+  assert.equal((await listReserves({ kind: 'all', search: 'zzzznotacountry' })).countries.length, 0);
+  assert.ok((await listReserves({ kind: 'all', search: 'switzerland' })).countries.length < total);
+  assert.equal((await listReserves({ kind: 'all', search: 'USA' })).countries.length, 1);
+});

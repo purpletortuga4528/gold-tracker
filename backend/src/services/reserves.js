@@ -44,6 +44,35 @@ async function load() {
 const slim = ({ history, ...rest }) => rest;
 
 /**
+ * Lowercased and stripped of diacritics, for comparing a typed query against a
+ * name as the feed spells it.
+ *
+ * The IMF spells one reporter "Türkiye, Republic of". Plain lowercasing meant
+ * that searching "Turkiye" found nothing at all: the row was reachable only by
+ * typing the umlaut, or by its ISO code, and it is a top ten holder and about
+ * the most likely name anyone would type. Decomposing to NFD and dropping the
+ * combining marks makes the two spellings meet.
+ *
+ * This covers the accented Latin set, which is what IRFCL uses, and more of it
+ * than the dataset needs today: Cote d'Ivoire, Sao Tome and Curacao are all
+ * eligible reporters whose names would arrive accented. It does not cover
+ * letters with no decomposition, such as the Danish slashed o or the German
+ * sharp s, and it is not a synonym table: "Turkey" still finds nothing, because
+ * the country renamed itself in 2022 and aliasing former names is a different
+ * decision from folding an accent.
+ *
+ * Folded per request rather than cached on the row. The dataset is 87 rows, so
+ * this is a few hundred small string operations on a search, which is nothing
+ * next to the response it is filtering.
+ */
+const fold = (s) =>
+  String(s)
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .trim()
+    .toLowerCase();
+
+/**
  * @param {{ search?: string, region?: string, kind?: string, limit?: number }} query
  */
 export async function listReserves({ search, region, kind = 'country', limit } = {}) {
@@ -59,12 +88,9 @@ export async function listReserves({ search, region, kind = 'country', limit } =
     rows = rows.filter((c) => (c.region ?? '').toLowerCase() === wanted);
   }
   if (search) {
-    const q = search.trim().toLowerCase();
+    const q = fold(search);
     rows = rows.filter(
-      (c) =>
-        c.countryName.toLowerCase().includes(q) ||
-        c.countryCode.toLowerCase().includes(q) ||
-        (c.region ?? '').toLowerCase().includes(q),
+      (c) => fold(c.countryName).includes(q) || fold(c.countryCode).includes(q) || fold(c.region ?? '').includes(q),
     );
   }
 

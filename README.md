@@ -48,7 +48,7 @@ installing only the backend on 20.6 and serving real data from it. Developed on
 Node 24.
 
 ```bash
-npm test              # both suites: 126 backend, 155 frontend
+npm test              # both suites: 128 backend, 155 frontend
 npm run test:backend
 npm run test:frontend
 npm run test:coverage
@@ -289,7 +289,7 @@ price provider: DEMONSTRATION DATA (not real prices)
 - **Dashboard** with the current price, a historical chart (1m to max), the top
   ten holders, and their combined value.
 - **Countries** table, sortable by every column except the rank number,
-  searchable by name, ISO code or region, filterable by region, with USD value
+  searchable by name, ISO code or region, with accents folded so a name does not need its diacritics typed, filterable by region, with USD value
   and gold's share of total reserves computed per row.
 - **Country detail** with the current holding in tonnes and ounces, its value,
   its share of total reserves, and the full month-by-month reported history.
@@ -422,7 +422,7 @@ straight out of `index.css` and composited in Node, so
 ground it can land on, including the tinted chips, in all four modes. No
 browser, no CSS engine, and it runs in CI with the rest of the suite.
 
-**The tests cover behaviour, not lines.** 281 of them: 126 backend, 155 frontend.
+**The tests cover behaviour, not lines.** 283 of them: 128 backend, 155 frontend.
 The frontend suite covers 86 percent of statements with `coverage.all` enabled,
 so untested files count as zero rather than being left out of the report. What
 is deliberately not covered is `App.jsx`, `Dashboard.jsx` and `PriceChart.jsx`:

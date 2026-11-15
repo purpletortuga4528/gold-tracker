@@ -323,9 +323,10 @@ the single easiest way to make this app confidently wrong. The conversion lives
 in one place per side (`backend/src/lib/units.js`, `frontend/src/lib/format.js`)
 and is covered by a test that pins the US figure to its published tonnage.
 
-**One price for the whole app.** The frontend holds the spot price in a single
-React context, so a table and a detail page cannot disagree about what a
-country's gold is worth.
+**One price for the whole app.** The frontend holds the price in a single React
+context, so a table and a detail page cannot disagree about what a country's
+gold is worth. Not "the spot price": what arrives may be a once-daily auction
+benchmark, and the response says which.
 
 **Caching is about the provider, not about speed.** The TTL cache also
 de-duplicates in-flight requests, so ten browser tabs opening at once make one

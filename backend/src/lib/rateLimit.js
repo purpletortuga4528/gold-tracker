@@ -7,8 +7,13 @@ import { config } from '../config.js';
  * Three buckets, because the endpoints do not cost the same thing. Measured
  * response sizes, uncompressed and gzipped:
  *
- *   /api/health                     0.3 kB    not compressed, under the threshold
+ *   /api/health                     0.4 kB    not compressed, under the threshold
  *   /api/price/current              0.3 kB    not compressed, under the threshold
+ *
+ * Health is the one figure here that moves on its own: the body carries the
+ * freshness grading, so it grows as the snapshot ages. It was written as 0.3
+ * and measures 379 bytes now. What the row is for holds either way, which is
+ * that both of these sit under the 1 kB compression threshold.
  *   /api/reserves                    29 kB -> 4.5 kB
  *   /api/price/history?range=max    694 kB -> 83 kB   <-- the amplifier
  *

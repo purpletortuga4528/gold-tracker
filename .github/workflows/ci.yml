@@ -74,13 +74,22 @@ jobs:
         run: npm run test:backend
 
       - name: Serves real data
+        # The log is dumped on failure, as the production job already does.
+        # Without it a failure here said only that the step exited non-zero,
+        # which on the one job that exists to prove the API runs on its
+        # declared floor is the least useful moment to be silent: the likely
+        # causes are a syntax error that Node 20.6 rejects and a dependency
+        # that quietly wants something newer, and both are in that output.
         run: |
-          npm start --prefix backend &
+          npm start --prefix backend > /tmp/floor.log 2>&1 &
           for i in $(seq 1 30); do
             curl -sf -o /dev/null http://127.0.0.1:5174/api/health && break
             sleep 1
           done
-          curl -sf 'http://127.0.0.1:5174/api/reserves?limit=1' | grep -q '"countryCode":"USA"'
+          curl -sf -o /dev/null http://127.0.0.1:5174/api/health \
+            || { echo "the API never came up on Node 20.6:"; cat /tmp/floor.log; exit 1; }
+          curl -sf 'http://127.0.0.1:5174/api/reserves?limit=1' | grep -q '"countryCode":"USA"' \
+            || { echo "the API came up but did not serve the expected data:"; cat /tmp/floor.log; exit 1; }
 
   production:
     # The self-hosting path is the one a user actually runs, so it gets checked

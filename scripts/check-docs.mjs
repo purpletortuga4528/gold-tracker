@@ -23,7 +23,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { get as httpGet } from 'node:http';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -306,12 +306,68 @@ for (const [key, actual] of [
 }
 
 // --- No em or en dashes in authored prose ----------------------------------
-for (const [name, text] of [['README.md', readme], ['data/README.md', dataReadme]]) {
-  // Escapes, not literals: this file would otherwise trip the very check it
-  // performs, and a rule enforced by a file that breaks it is a bad rule.
-  const n = (text.match(/[\u2013\u2014]/g) ?? []).length;
-  if (n) bad(`${name} dash policy`, `${n} em/en dashes present`);
-  else ok(`${name} dash policy`);
+/*
+ * Whole repository, not two files.
+ *
+ * This checked README.md and data/README.md only, which left the policy
+ * enforced on two documents out of a hundred and thirty and spot-checked
+ * everywhere else: the provider README, NOTICE.md, .env.example, every source
+ * comment and every commit-adjacent file were on trust.
+ *
+ * The pattern is written with escapes rather than literals, because this file
+ * would otherwise trip the check it performs, and a rule enforced by a file
+ * that breaks it is a bad rule.
+ *
+ * EXEMPT is for a file that legitimately needs one, such as a fixture whose
+ * whole point is a dash, or a test asserting this very policy. It is empty,
+ * and anything added to it wants a reason beside it.
+ */
+{
+  const EXEMPT = new Set([]);
+  const skipDir = /node_modules|[/\\]\.git$|[/\\]dist$|test-results|playwright-report|[/\\]\.vite/;
+  const skipFile = /\.(png|jpe?g|gif|svg|woff2?|ttf|ico|zip|pdf)$/i;
+
+  const walk = (dir) => {
+    const out = [];
+    for (const entry of readdirSync(dir)) {
+      const p = resolve(dir, entry);
+      let s;
+      try {
+        s = statSync(p);
+      } catch {
+        continue;
+      }
+      if (s.isDirectory()) {
+        if (!skipDir.test(p)) out.push(...walk(p));
+      } else if (!skipFile.test(p)) {
+        out.push(p);
+      }
+    }
+    return out;
+  };
+
+  const offenders = [];
+  let scanned = 0;
+
+  for (const file of walk(ROOT)) {
+    const rel = file.slice(ROOT.length + 1).replace(/\\/g, '/');
+    if (EXEMPT.has(rel)) continue;
+    let text;
+    try {
+      text = readFileSync(file, 'utf8');
+    } catch {
+      continue;
+    }
+    scanned += 1;
+    const n = (text.match(/[\u2013\u2014]/g) ?? []).length;
+    if (n) {
+      const first = text.search(/[\u2013\u2014]/);
+      offenders.push(`${rel}:${text.slice(0, first).split('\n').length} (${n})`);
+    }
+  }
+
+  if (offenders.length) bad('dash policy', `em/en dashes in ${offenders.join(', ')}`);
+  else ok(`dash policy (${scanned} files)`);
 }
 
 // --- Every command the docs tell you to run exists -------------------------

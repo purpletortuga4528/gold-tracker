@@ -127,10 +127,16 @@ for (const [key, actual] of [
 
 // --- Dataset counts quoted in prose ----------------------------------------
 {
-  const [quoted] = claims(readme, /\((\d+) countries, monthly figures back to/);
-  if (Number(quoted) !== dataset.meta.countryCount) {
-    bad('README country count', `says ${quoted}, dataset has ${dataset.meta.countryCount}`);
-  } else ok(`README country count (${quoted})`);
+  // "reporting economies", not "countries": two of the 85 are Hong Kong SAR
+  // and West Bank and Gaza, and the README was the last place calling them all
+  // countries. The wording is matched loosely enough to survive a reword of
+  // the surrounding sentence but not loosely enough to match something else.
+  const [quoted] = claims(readme, /\((\d+) reporting economies, monthly/);
+  if (quoted === undefined) {
+    bad('README reporting-economy count', 'the figure is no longer in the sentence that stated it');
+  } else if (Number(quoted) !== dataset.meta.countryCount) {
+    bad('README reporting-economy count', `says ${quoted}, dataset has ${dataset.meta.countryCount}`);
+  } else ok(`README reporting-economy count (${quoted})`);
 }
 {
   /*

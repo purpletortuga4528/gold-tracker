@@ -153,8 +153,13 @@ The [IMF International Reserves and Foreign Currency Liquidity
 dataset](https://data.imf.org/en/datasets/IMF.STA:IRFCL) publishes each
 reporting economy's gold holding as a volume in fine troy ounces, over an open
 SDMX API with no key. `npm run build:data` pulls it, converts to tonnes and
-writes `backend/data/gold-reserves.json` (85 countries, monthly figures back to
-2010).
+writes `backend/data/gold-reserves.json` (85 reporting economies, monthly
+figures back to 2010).
+
+"Reporting economies" rather than countries, which is the IMF's term and the
+app's own throughout. Two of the 85 are not countries: Hong Kong SAR and West
+Bank and Gaza both file to the reserves template. This line was the only place
+left calling all of them countries.
 
 This replaces the "download a spreadsheet from the World Gold Council by hand"
 approach: every figure is traceable to a query URL recorded in the file's own

@@ -48,7 +48,7 @@ installing only the backend on 20.6 and serving real data from it. Developed on
 Node 24.
 
 ```bash
-npm test              # both suites: 128 backend, 155 frontend
+npm test              # both suites: 128 backend, 157 frontend
 npm run test:backend
 npm run test:frontend
 npm run test:coverage
@@ -422,7 +422,7 @@ straight out of `index.css` and composited in Node, so
 ground it can land on, including the tinted chips, in all four modes. No
 browser, no CSS engine, and it runs in CI with the rest of the suite.
 
-**The tests cover behaviour, not lines.** 283 of them: 128 backend, 155 frontend.
+**The tests cover behaviour, not lines.** 285 of them: 128 backend, 157 frontend.
 The frontend suite covers 86 percent of statements with `coverage.all` enabled,
 so untested files count as zero rather than being left out of the report. What
 is deliberately not covered is `App.jsx`, `Dashboard.jsx` and `PriceChart.jsx`:
@@ -445,14 +445,18 @@ every row; the element count is lower on other pages:
 
 | Mode | Bar | Worst measured | Failing |
 |---|---|---|---|
-| light / normal | AA 4.5 | 5.37 | 0 of 643 |
-| light / high | AAA 7.0 | 11.52 | 0 of 643 |
-| dark / normal | AA 4.5 | 6.45 | 0 of 643 |
-| dark / high | AAA 7.0 | 15.37 | 0 of 643 |
+| light / normal | AA 4.5 | 5.37 | 0 of 730 |
+| light / high | AAA 7.0 | 11.52 | 0 of 730 |
+| dark / normal | AA 4.5 | 6.45 | 0 of 730 |
+| dark / high | AAA 7.0 | 15.37 | 0 of 730 |
 
 An element counts if it has a direct non-empty text node, is visible, and has a
-non-zero box. Those four rows are printed by `npm run test:browser`, so this
-table is one command to re-derive rather than a number somebody remembers.
+non-zero box. Those four rows are printed by `npm run test:browser`, which also compares
+them against this table and fails when they disagree. So the table is not a
+number somebody remembers: it is checked, and a change that moves a ratio or
+the element count has to update it. Adding two screen-reader spans moved the
+count from 643 to 730 and the table went stale, which is why it is checked
+now rather than merely printed.
 
 Three real defects came out of running it, and the third is the one worth
 repeating. The light accent was darkened from `#a37814` to `#8a6412`, because

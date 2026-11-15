@@ -1,4 +1,7 @@
 import { expect, test } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { measureContrast } from './measure-contrast.js';
 
 /**
@@ -98,18 +101,56 @@ test('the hyperlegible face does not change any colour', async ({ page }) => {
   expect(result.elements.filter((e) => e.ratio < BARS.normal)).toHaveLength(0);
 });
 
-test('the worst ratio in each mode is reported, so the README can be checked against it', async ({ page }) => {
-  // Not an assertion about a specific number: those drift with the design and
-  // pinning them would make every visual change a test edit. This prints the
-  // table the README quotes, so re-measuring it is running one command.
-  const rows = [];
+test('the README table matches what is actually measured', async ({ page }) => {
+  /*
+   * This used to print the four rows and assert nothing about them, on the
+   * reasoning that the ratios drift with the design and pinning them would
+   * make every visual change a test edit.
+   *
+   * Half of that was right and the conclusion was wrong. The README publishes
+   * these figures, and a published figure nobody checks is the thing this
+   * repository keeps finding: adding two screen-reader spans moved the element
+   * count from 643 to 730, the table still said 643, and only reading the
+   * output by eye caught it. A visual change that moves the worst ratio SHOULD
+   * require updating a table that states the worst ratio. That is not a chore,
+   * it is the table being true.
+   */
+  const readme = readFileSync(resolve(fileURLToPath(import.meta.url), '../../../README.md'), 'utf8');
+
+  const printed = [];
+  const mismatches = [];
+
   for (const mode of MODES) {
     await loadIn(page, mode);
     const { elements, unparsed } = await page.evaluate(measureContrast);
     expect(unparsed).toEqual([]);
-    rows.push(
-      `  ${`${mode.theme}/${mode.contrast}`.padEnd(14)} bar ${String(BARS[mode.contrast]).padEnd(4)} worst ${String(elements[0].ratio).padEnd(6)} of ${elements.length} elements`,
+
+    const bar = BARS[mode.contrast];
+    const worst = elements[0].ratio;
+    const count = elements.length;
+    printed.push(
+      `  ${`${mode.theme}/${mode.contrast}`.padEnd(14)} bar ${String(bar).padEnd(4)} worst ${String(worst).padEnd(6)} of ${count} elements`,
     );
+
+    // The row as the README writes it, e.g.
+    //   | light / normal | AA 4.5 | 5.37 | 0 of 730 |
+    const label = `${mode.theme} / ${mode.contrast}`;
+    const row = new RegExp(
+      `\\|\\s*${label}\\s*\\|[^|]*\\|\\s*([\\d.]+)\\s*\\|\\s*0 of (\\d+)\\s*\\|`,
+    ).exec(readme);
+
+    if (!row) {
+      mismatches.push(`${label}: no row for it in the README table`);
+      continue;
+    }
+    if (Number(row[1]) !== worst) mismatches.push(`${label}: README says worst ${row[1]}, measured ${worst}`);
+    if (Number(row[2]) !== count) mismatches.push(`${label}: README says ${row[2]} elements, measured ${count}`);
   }
-  console.log(`\nContrast, measured on /countries:\n${rows.join('\n')}\n`);
+
+  console.log(`\nContrast, measured on /countries:\n${printed.join('\n')}\n`);
+
+  expect(
+    mismatches,
+    `The contrast table in README.md no longer matches measurement:\n  ${mismatches.join('\n  ')}\n`,
+  ).toEqual([]);
 });

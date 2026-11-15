@@ -119,11 +119,21 @@ export function ReservesTable({ countries, selectable, selected, onToggle }) {
                   </span>
                 )}
                 {c.unitScaleApplied && (
+                  /* The evidence is in an sr-only span as well as the title,
+                     because a title on a non-focusable span is reachable only
+                     by hovering a mouse over it. It was the only place the
+                     arithmetic appeared in this table, so for anyone reading
+                     by keyboard or screen reader the pill said that a figure
+                     had been altered and gave no way to find out how. */
                   <span
                     className="ml-2"
                     title={`Unit correction: ${c.unitScaleApplied.evidence}`}
                   >
                     <Pill tone="warn">unit fix</Pill>
+                    <span className="sr-only">
+                      {' '}
+                      Unit correction applied. {c.unitScaleApplied.evidence}
+                    </span>
                   </span>
                 )}
               </td>
@@ -143,6 +153,15 @@ export function ReservesTable({ countries, selectable, selected, onToggle }) {
                     title="This economy does not report total reserve assets alongside its gold, so the share cannot be computed."
                   >
                     n/a
+                    {/* Same reason as the unit-fix pill above: "n/a" on its own
+                        reads as missing data rather than as a figure that
+                        cannot be computed, and the difference was in a tooltip
+                        only a mouse could reach. */}
+                    <span className="sr-only">
+                      {' '}
+                      This economy does not report total reserve assets alongside its gold, so the
+                      share cannot be computed.
+                    </span>
                   </span>
                 ) : (
                   formatPercent(c.shareOfReserves)

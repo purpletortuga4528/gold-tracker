@@ -74,11 +74,20 @@ const show = (props = {}) =>
   );
 
 /** Country names in the order they are rendered. */
+/*
+ * Read from the country link, not from the whole cell.
+ *
+ * This used to take the cell's textContent and strip the strings "unit fix"
+ * and "country" out of it, which meant every badge added to that cell had to
+ * be remembered here: adding screen-reader text for the unit correction broke
+ * three sorting tests that have nothing to do with badges. The link carries
+ * exactly the country name and nothing else.
+ */
 const orderedNames = () =>
   screen
     .getAllByRole('row')
     .slice(1)
-    .map((row) => within(row).getAllByRole('cell')[1].textContent.replace(/unit fix|country/g, '').trim());
+    .map((row) => within(row).getAllByRole('link')[0].textContent.trim());
 
 const headerButton = (label) => screen.getByRole('button', { name: new RegExp(label) });
 
@@ -200,5 +209,26 @@ describe('selection', () => {
     show({ selectable: true, selected: ['CHN'], onToggle: () => {} });
     expect(screen.getByRole('checkbox', { name: /Compare China/ })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: /Compare United States/ })).not.toBeChecked();
+  });
+});
+
+describe('information that was in a tooltip only', () => {
+  test('the unit correction arithmetic is readable without a mouse', async () => {
+    // A title attribute on a non-focusable span is reachable only by hovering.
+    // This was the single place the arithmetic appeared in this table, so by
+    // keyboard or screen reader the pill announced that a figure had been
+    // altered and offered no way to find out how.
+    show();
+    const row = screen.getByRole('link', { name: 'Brazil' }).closest('tr');
+    expect(within(row).getByText(/Unit correction applied/)).toBeInTheDocument();
+    expect(within(row).getByText(/1000x below market/)).toBeInTheDocument();
+  });
+
+  test('an uncomputable share says why, not just n/a', async () => {
+    // "n/a" alone reads as missing data rather than as a figure that cannot be
+    // computed, and the difference was in a tooltip.
+    show();
+    const row = screen.getByRole('link', { name: 'Singapore' }).closest('tr');
+    expect(within(row).getByText(/does not report total reserve assets/)).toBeInTheDocument();
   });
 });

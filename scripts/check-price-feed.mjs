@@ -173,8 +173,14 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
    *
    * The process then exited 127. So the one path this script is most careful
    * about, the SKIP that deliberately refuses to fail a build over somebody
-   * else's outage, was the path that crashed and failed the build anyway, with
-   * a message about neither the feed nor the build.
+   * else's outage, was the path that aborted and reported neither the feed nor
+   * the build.
+   *
+   * Observed on Windows only, and that scoping is the honest limit of it: the
+   * assertion lives in libuv's Windows code, CI runs on Linux, and whether the
+   * weekly job there was ever affected was never established. The step runs
+   * with `if: always()` and no continue-on-error, so a non-zero exit would
+   * fail it; that it ever did on Linux is not something this found out.
    *
    * It is the exit that does it, not the request's abort timer: it reproduces
    * identically with the signal removed, and AbortSignal.timeout is unref'd so

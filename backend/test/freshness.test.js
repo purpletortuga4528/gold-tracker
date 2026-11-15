@@ -64,3 +64,42 @@ test('the worst of the two clocks decides the overall grade', async () => {
   const f = await getFreshness(daysAfter(snapshot.generatedAt, SNAPSHOT_STALE_DAYS + 1));
   assert.equal(f.overall, 'stale', 'a stale snapshot must not be masked by fresh-looking data');
 });
+
+/*
+ * The advice has to be runnable, not just present.
+ *
+ * It used to say "Rebuild the snapshot with: npm run build:data" in every
+ * state, including the two where that command cannot do anything. It is read
+ * by the CLI and printed in the app's own staleness banner, so a reader with a
+ * synthetic provider configured was told to run something the ingest refuses
+ * outright, with no hint why. An instruction that fails costs whoever follows
+ * it a round of debugging before they learn what this module already knew.
+ */
+test('with a generated-price provider, the advice says the rebuild will refuse', async () => {
+  const { getProvider } = await import('../src/services/priceProviders/index.js');
+  const demo = getProvider('demo');
+  assert.equal(demo.synthetic, true, 'this test is meaningless if demo is not synthetic');
+
+  // Injected rather than set through PRICE_PROVIDER: config reads that once at
+  // import, so assigning the variable here would change nothing and this test
+  // would pass against the default provider while asserting nothing.
+  const { snapshot } = await getFreshness();
+  const f = await getFreshness(daysAfter(snapshot.generatedAt, SNAPSHOT_STALE_DAYS + 1), {
+    provider: () => demo,
+  });
+  assert.match(f.action, /build:data/, 'it should still name the command');
+  assert.match(f.action, /generates prices/, 'and say why it will not work');
+});
+
+test('with a real provider, the advice says what the rebuild needs', async () => {
+  // Not a prediction that it will fail: whether a provider can serve a decade
+  // of daily prices is something only the attempt settles. What it must not do
+  // is imply that today's price is enough, which is the misunderstanding that
+  // sends someone to configure a spot-only provider and wonder why the ingest
+  // exits 3.
+  const { snapshot } = await getFreshness();
+  const f = await getFreshness(daysAfter(snapshot.generatedAt, SNAPSHOT_STALE_DAYS + 1));
+  assert.match(f.action, /build:data/);
+  assert.match(f.action, /whole history/);
+  assert.doesNotMatch(f.action, /generates prices/);
+});

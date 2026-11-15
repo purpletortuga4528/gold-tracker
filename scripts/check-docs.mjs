@@ -83,6 +83,48 @@ for (const [key, actual] of [
   else ok(`.env.example ${key} (${actual})`);
 }
 
+// --- The same measurement, quoted in three places, must agree -------------
+/*
+ * The request-burst and payload figures that justify the rate limits appear in
+ * the README table, in rateLimit.js beside the numbers they explain, and in
+ * .env.example beside the variables. Nothing derives them from anything, so
+ * they drift independently, and .env.example had drifted on all three at once:
+ * 20 requests for a Compare load that fires 10, about 55 for a five page walk
+ * that is 15, and a 60 byte request that is 67.
+ *
+ * No expected value is written here, deliberately. This asserts only that the
+ * three files agree with each other, so correcting one of them is not enough
+ * to make the check pass while the other two still disagree.
+ */
+{
+  const rateLimitSrc = read('backend/src/lib/rateLimit.js');
+  const figures = [
+    ['Compare burst', /(\d+) requests inside a millisecond/],
+    ['history request size', /(\d+) byte request/],
+    // Three digits or more, and not the tail of a decimal: a bare `(\d+) kB`
+    // matched the "3" in rateLimit.js's "0.3 kB" table row and reported the
+    // files as disagreeing about a figure all three had right.
+    ['history payload size', /(?<![\d.])(\d{3,}) kB/],
+  ];
+
+  for (const [what, re] of figures) {
+    const seen = [
+      ['README.md', claims(readme, re)[0]],
+      ['rateLimit.js', claims(rateLimitSrc, re)[0]],
+      ['.env.example', claims(envExample, re)[0]],
+    ].filter(([, v]) => v !== undefined);
+
+    const distinct = [...new Set(seen.map(([, v]) => v))];
+    if (seen.length < 2) {
+      skip(`${what} agrees across files`, `quoted in fewer than two of the three files`);
+    } else if (distinct.length > 1) {
+      bad(`${what} agrees across files`, seen.map(([f, v]) => `${f} says ${v}`).join('; '));
+    } else {
+      ok(`${what} agrees across files (${distinct[0]}, in ${seen.length})`);
+    }
+  }
+}
+
 // --- Dataset counts quoted in prose ----------------------------------------
 {
   const [quoted] = claims(readme, /\((\d+) countries, monthly figures back to/);
@@ -229,7 +271,7 @@ for (const [name, text] of [['README.md', readme], ['data/README.md', dataReadme
   else ok(`${name} dash policy`);
 }
 
-// --- No component names a benchmark in a literal --------------------------
+// --- No component names a benchmark ------------------------------------
 /*
  * The chart's tooltip used to read "LBMA PM fix" from a string literal, for
  * every provider. Under PRICE_PROVIDER=demo that put a real benchmark's name
@@ -273,20 +315,30 @@ for (const [name, text] of [['README.md', readme], ['data/README.md', dataReadme
       .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
       .replace(/\/\/[^\n]*/g, (m) => ' '.repeat(m.length));
 
+  /*
+   * Any mention outside a comment, not just one inside quotes.
+   *
+   * The first version of this check only matched quoted string literals, and
+   * so passed while the footer in App.jsx told every reader on every page that
+   * the price came from the LBMA daily auction. JSX renders bare text, which
+   * carries no quotes, and that is the most visible place a component can
+   * assert something. A check that only inspects the syntax the last bug
+   * happened to use is the same blind spot the contrast audit had.
+   */
   const offenders = [];
   for (const file of components) {
     const code = stripComments(readFileSync(file, 'utf8'));
     for (const [i, line] of code.split('\n').entries()) {
-      if (/['"`][^'"`]*\bLBMA\b[^'"`]*['"`]/.test(line)) {
+      if (/\bLBMA\b/.test(line)) {
         offenders.push(`${file.slice(ROOT.length + 1).replace(/\\/g, '/')}:${i + 1}`);
       }
     }
   }
 
   if (offenders.length) {
-    bad('no frontend literal names a benchmark', `${offenders.join(', ')} should read it from the response`);
+    bad('no frontend component names a benchmark', `${offenders.join(', ')} should read it from the response`);
   } else {
-    ok(`no frontend literal names a benchmark (${components.length} files scanned)`);
+    ok(`no frontend component names a benchmark (${components.length} files scanned)`);
   }
 }
 

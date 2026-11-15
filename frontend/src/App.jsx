@@ -80,9 +80,15 @@ export default function App() {
           </main>
 
           <footer className="mx-auto max-w-6xl px-4 pb-10 text-xs text-ink-subtle">
-            Reserves from the IMF. Price from the LBMA daily auction unless
-            configured otherwise. Neither is investment advice, and neither is a
-            complete picture of the world's official gold.
+            {/* The price source is not named here. This said "Price from the
+                LBMA daily auction unless configured otherwise", which was a
+                claim about a feed that is now shut, printed on every page: with
+                the demo provider it told the reader invented numbers came from
+                a London auction. Only the response knows what is serving, so
+                the price panel names it and this does not guess. */}
+            Reserves from the IMF. The price panel names whichever provider
+            served the figures beside it. Neither is investment advice, and
+            neither is a complete picture of the world's official gold.
           </footer>
         </div>
       </PriceProvider>

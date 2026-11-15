@@ -51,8 +51,12 @@ EXPOSE 5174
 # Reports unhealthy when the snapshot has gone stale as well as when the process
 # is down. Stale means the thresholds in services/freshness.js: a snapshot over
 # 70 days old, or figures over 120. A container that is up and serving a
-# snapshot nobody has rebuilt since May is not healthy in any sense that
+# snapshot nobody has rebuilt in ten weeks is not healthy in any sense that
 # matters, and a check that only pings the port would call it fine.
+#
+# Said as a duration, not a month. This read "nobody has rebuilt since May",
+# which was the stale threshold expressed as a date when it was written and was
+# simply wrong by the autumn.
 HEALTHCHECK --interval=60s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||5174)+'/api/health').then(r=>r.json()).then(j=>process.exit(j.ok?0:1)).catch(()=>process.exit(1))"
 

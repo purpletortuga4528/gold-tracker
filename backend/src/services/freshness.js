@@ -1,4 +1,5 @@
 import { getReservesMeta } from './reserves.js';
+import { getProvider } from './priceProviders/index.js';
 
 /**
  * How stale the reserves snapshot is.
@@ -38,7 +39,15 @@ function grade(age, warn, stale) {
 
 const WORST_FIRST = ['unknown', 'stale', 'ageing', 'fresh'];
 
-export async function getFreshness(now = new Date()) {
+/**
+ * @param now  the moment to judge against, injected so no test depends on the
+ *   calendar. See the note at the top of freshness.test.js.
+ * @param provider  how to find the active price provider, injected for the
+ *   same reason `now` is: PRICE_PROVIDER is read into `config` once at import,
+ *   so setting the variable inside a test changes nothing and the advice
+ *   branches below would be untestable.
+ */
+export async function getFreshness(now = new Date(), { provider = activeProvider } = {}) {
   const meta = await getReservesMeta();
 
   const generatedAt = meta.generatedAt ? new Date(meta.generatedAt) : null;
@@ -73,6 +82,55 @@ export async function getFreshness(now = new Date()) {
         ? null
         : snapshot.status === 'fresh'
           ? 'The snapshot is current but the IMF has not published a recent figure. Check the source before relying on these numbers.'
-          : 'Rebuild the snapshot with: npm run build:data',
+          : rebuildAdvice(provider()),
   };
+}
+
+/*
+ * What to actually do, which is not always "rebuild".
+ *
+ * This said "Rebuild the snapshot with: npm run build:data" whatever the state
+ * of the price feed. That command needs a price series to run unit detection
+ * against, so with the default provider closed it exits 3 and writes nothing,
+ * and the advice sent whoever read it, in the CLI and in the app's own banner,
+ * to run a command that cannot work and does not explain itself in those
+ * terms. An instruction that fails is worse than no instruction: it costs
+ * someone a round of debugging before they learn what this already knows.
+ */
+function rebuildAdvice(provider) {
+  const rebuild = 'Rebuild the snapshot with: npm run build:data';
+
+  if (provider === null) return rebuild;
+
+  if (provider.synthetic) {
+    return (
+      `${rebuild} -- but PRICE_PROVIDER is "${provider.id}", which generates prices, and the ` +
+      'ingest refuses to decide unit corrections against invented numbers. Set a real provider first.'
+    );
+  }
+
+  // Not phrased as a prediction of failure. Whether a given provider can serve
+  // a decade of daily prices is something only the attempt establishes, and
+  // claiming it cannot would be the same guessing this file is here to stop.
+  return (
+    `${rebuild} -- which needs a price series covering the whole history, not just today, ` +
+    'because each filing is priced against the gold price of its own month. If it exits 3, ' +
+    'the provider could not supply that: see backend/.env.example.'
+  );
+}
+
+/**
+ * The active provider, or null if it cannot be determined.
+ *
+ * Imported lazily and guarded: freshness is read by /api/health, and a
+ * provider registry that threw at import would turn "the data is ageing" into
+ * a failed health check, which is a worse answer than a less specific
+ * sentence.
+ */
+function activeProvider() {
+  try {
+    return getProvider();
+  } catch {
+    return null;
+  }
 }

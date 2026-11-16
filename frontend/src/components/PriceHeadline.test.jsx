@@ -117,3 +117,52 @@ describe('one price for the whole app', () => {
     expect(api.currentPrice).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('when there is no price at all', () => {
+  /** Drives the real provider into its error state, as the tests above do. */
+  const fail = async () => {
+    api.currentPrice.mockImplementation(async () => {
+      throw new Error('Could not reach the gold price provider');
+    });
+    show();
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+  };
+
+  test('it works an example through, so the empty columns are not a mystery', async () => {
+    /*
+     * A reader who arrives with the feed shut has never seen the dollar
+     * columns do anything. This shows what they would do, without quoting a
+     * real price: the benchmark is licensed, which is why they are empty.
+     */
+    await fail();
+
+    expect(screen.getByText(/What a price would give you/)).toBeInTheDocument();
+    // $128.6M, not $128.60M: formatUsdCompact caps at two fraction digits and
+    // so drops the trailing zero. Asserted as the component actually renders
+    // it rather than as a hand-computed toFixed(2).
+    expect(screen.getByText(/32,150\.7466/)).toBeInTheDocument();
+    expect(screen.getByText(/\$128\.6M/)).toBeInTheDocument();
+  });
+
+  test('the example is marked hypothetical, twice, and quotes no real benchmark', async () => {
+    // The figure must never read as a quote. If it did, this panel would be
+    // redistributing the thing the app is careful not to redistribute.
+    await fail();
+
+    expect(screen.getByText(/at a hypothetical/)).toBeInTheDocument();
+    expect(screen.getByText(/an illustration, not a quote/)).toBeInTheDocument();
+    expect(screen.queryByText(/LBMA/)).not.toBeInTheDocument();
+
+    /*
+     * The only per-ounce figure on the panel is the round hypothetical one.
+     *
+     * Asserted by shape rather than by naming the real fix: writing that value
+     * here would make this file hold a recorded price, which is the thing
+     * NOTICE.md inventories and check:docs counts. It flagged exactly that on
+     * the first version of this test.
+     */
+    const perOunce = [...screen.getByText(/at a hypothetical/).textContent.matchAll(/\$([\d,]+)\.?\d* an ounce/g)];
+    expect(perOunce).toHaveLength(1);
+    expect(perOunce[0][1]).toBe('4,000');
+  });
+});

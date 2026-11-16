@@ -26,14 +26,30 @@ export function ReservesTable({ countries, selectable, selected, onToggle }) {
   const [sort, setSort] = useState({ key: 'reserveTonnes', dir: 'desc' });
 
   const rows = useMemo(() => {
-    const withValue = countries.map((c, i) => ({
-      ...c,
-      rank: i + 1,
-      valueUsd: price ? reserveValueUsd(c.reserveTonnes, price.priceUsdPerOunce) : null,
-      shareOfReserves: price
+    /*
+     * The share can be missing for two unrelated reasons, and the cell used to
+     * blame the wrong one.
+     *
+     * It said "this economy does not report total reserve assets" whenever the
+     * share was null, which is true only when that is actually why. With no
+     * price every row is null, so with the feed shut the table told the reader
+     * that all 87 reporters fail to file their total reserves. Every one of
+     * them files it; the United States reports 241.7 billion of non-gold
+     * reserves. The column beside it got the same cause right, saying "price
+     * unavailable", which is what made the mistake easy to miss here.
+     */
+    const withValue = countries.map((c, i) => {
+      const share = price
         ? goldShareOfReserves(c.reserveTonnes, price.priceUsdPerOunce, c.nonGoldReservesUsd)
-        : null,
-    }));
+        : null;
+      return {
+        ...c,
+        rank: i + 1,
+        valueUsd: price ? reserveValueUsd(c.reserveTonnes, price.priceUsdPerOunce) : null,
+        shareOfReserves: share,
+        shareMissing: share !== null ? null : price ? 'not-reported' : 'no-price',
+      };
+    });
     const dir = sort.dir === 'asc' ? 1 : -1;
     return [...withValue].sort((a, b) => {
       const x = a[sort.key];
@@ -150,17 +166,21 @@ export function ReservesTable({ countries, selectable, selected, onToggle }) {
                 {c.shareOfReserves == null ? (
                   <span
                     className="text-ink-subtle"
-                    title="This economy does not report total reserve assets alongside its gold, so the share cannot be computed."
+                    title={
+                      c.shareMissing === 'no-price'
+                        ? 'The share is gold at market over gold plus non-gold reserves, so it needs a gold price. This economy does report its total reserve assets.'
+                        : 'This economy does not report total reserve assets alongside its gold, so the share cannot be computed.'
+                    }
                   >
-                    n/a
-                    {/* Same reason as the unit-fix pill above: "n/a" on its own
-                        reads as missing data rather than as a figure that
-                        cannot be computed, and the difference was in a tooltip
-                        only a mouse could reach. */}
+                    {c.shareMissing === 'no-price' ? 'needs a price' : 'n/a'}
+                    {/* Same reason as the unit-fix pill above: the explanation
+                        was in a tooltip only a mouse could reach. And it has to
+                        name the right cause: see the note in the useMemo. */}
                     <span className="sr-only">
                       {' '}
-                      This economy does not report total reserve assets alongside its gold, so the
-                      share cannot be computed.
+                      {c.shareMissing === 'no-price'
+                        ? 'The share needs a gold price, which is unavailable. This economy does report its total reserve assets.'
+                        : 'This economy does not report total reserve assets alongside its gold, so the share cannot be computed.'}
                     </span>
                   </span>
                 ) : (

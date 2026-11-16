@@ -44,11 +44,47 @@ auction results, fetched at runtime from <https://prices.lbma.org.uk>. That feed
 closed in late 2026 and the benchmark now requires a licence from ICE Benchmark
 Administration, whose terms govern obtaining, using and redistributing it.
 
-**No price data of any kind is stored in this repository.** It never was: prices
-are requested when the app runs and held only in memory, and every dollar figure
-in `backend/data/gold-reserves.json` is derived from the IMF's own columns, not
-from any price feed. If you configure the metals.dev provider, that data arrives
-under your own key and metals.dev's terms, and likewise is never written here.
+**No price series is stored in this repository, and none ever was.** Prices are
+requested when the app runs and held only in memory. Every dollar figure in
+`backend/data/gold-reserves.json` is derived from the IMF's own columns, not
+from any price feed. If you configure the metals.dev provider, that data
+arrives under your own key and metals.dev's terms, and likewise is never
+written here.
+
+What is here is a single published fix, quoted as documentation and as a test
+fixture, in these places:
+
+| Where | What |
+|---|---|
+| `backend/data/gold-reserves.json` | `meta.unitDetection.latestReferencePriceUsdPerOunce`, one USD figure with its date, recording what the last build priced filings against |
+| `README.md`, `scripts/check-price-feed.mjs` | one feed row quoted to show the shape the provider reads, carrying its USD, GBP and EUR values |
+| `backend/test/price-feed.test.js` | the same row as a fixture, so the shape checker has something to check |
+| `backend/data/README.md` | the same USD figure, naming the price the published share was struck at |
+
+All of it is the PM fix of 2026-09-08. It is recorded because a figure derived
+from a price is not reproducible without knowing which price, and a shape
+checker needs a shape to compare against.
+
+Separately, `backend/src/services/priceProviders/demo.js` holds fourteen
+historical gold price levels, each with a date, used as anchors for the
+generated series so that a chart of it has a recognisable shape. They are
+widely published historical figures, such as the January 1980 peak and the
+1999 low, and none is drawn from a current licensed feed. The provider's own
+disclaimer states that the curve passes through real historical levels and
+that no value it serves is a published price.
+
+Its most recent anchor was until recently the real fix above, rounded, with
+cross-rate multipliers taken from that day. That made the demonstration series
+reproduce the benchmark to within 0.011 percent in three currencies, which is
+not a demonstration series. It is now a round number, visibly its own, and a
+test fails if it ever comes within two percent of the recorded reference again.
+
+This file previously said no price data of any kind was stored, which was not
+accurate, and a licensing notice that overstates its own position is worth less
+than one that does not. Whether quoting individual published observations this
+way is permitted is a question for IBA's terms and not one this file answers.
+If you are redistributing this repository and that distinction matters to you,
+read those terms. No interpretation of them is offered here.
 
 ## Atkinson Hyperlegible Next
 

@@ -1,6 +1,45 @@
 import { usePrice } from '../lib/usePrice.jsx';
-import { formatPrice, formatDate } from '../lib/format.js';
+import {
+  formatPrice,
+  formatDate,
+  formatUsdCompact,
+  reserveValueUsd,
+  TROY_OUNCES_PER_TONNE,
+} from '../lib/format.js';
 import { Pill, Spinner, ErrorNote } from './Ui.jsx';
+
+/**
+ * A round number, chosen to be obviously not a quote.
+ *
+ * The point of the panel below is to show what the dollar columns would do
+ * once a provider is configured, for a reader who has only ever seen them
+ * empty. It must not do that by quoting a real price: the benchmark is
+ * licensed, which is the whole reason those columns are empty. So the example
+ * is explicitly hypothetical and says so twice.
+ */
+const EXAMPLE_PRICE_USD = 4000;
+
+/** What the value columns would show, worked through on one tonne. */
+function WorkedExample() {
+  const perTonne = reserveValueUsd(1, EXAMPLE_PRICE_USD);
+
+  return (
+    <div className="mt-4 rounded-lg border border-line bg-raised p-3 text-sm text-ink-muted">
+      <p className="font-medium text-ink">What a price would give you</p>
+      <p className="mt-1">
+        A tonne is {TROY_OUNCES_PER_TONNE.toLocaleString('en-US', { maximumFractionDigits: 4 })} fine
+        troy ounces. So at a hypothetical {formatPrice(EXAMPLE_PRICE_USD)} an ounce, one tonne of
+        gold is worth about {formatUsdCompact(perTonne)}, and the dollar column below would fill in
+        at that rate for every holding on the page.
+      </p>
+      <p className="mt-2 text-ink-subtle">
+        That figure is an illustration, not a quote: it uses a round number precisely because the
+        real benchmark is the thing this app cannot reach. Configure a provider and every dollar
+        value and share of reserves is computed from the real one instead.
+      </p>
+    </div>
+  );
+}
 
 /**
  * The current price, stated with its actual freshness rather than dressed up as
@@ -13,13 +52,16 @@ export function PriceHeadline() {
   if (loading) return <Spinner label="Fetching the gold price" />;
   if (error) {
     return (
-      <ErrorNote
-        error={error}
-        hint={
-          'The reserve figures below do not depend on this, so tonnages are still right. ' +
-          'Only the dollar values and the share of reserves need a price.'
-        }
-      />
+      <div>
+        <ErrorNote
+          error={error}
+          hint={
+            'The reserve figures below do not depend on this, so tonnages are still right. ' +
+            'Only the dollar values and the share of reserves need a price.'
+          }
+        />
+        <WorkedExample />
+      </div>
     );
   }
 

@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -6,9 +6,23 @@ import { ReservesTable } from './ReservesTable.jsx';
 
 const PRICE = { priceUsdPerOunce: 4402.55, benchmark: 'LBMA Gold Price PM', asOfDate: '2026-09-07' };
 
+/*
+ * The price is settable, because every test here used to run with one present.
+ * That is why the share column could tell every reader that all 87 reporters
+ * fail to file their total reserves whenever the feed was down: the only null
+ * share any test ever saw was a row that genuinely lacked the figure, so the
+ * two causes were indistinguishable in the suite.
+ */
+const mocks = vi.hoisted(() => ({ price: null }));
+mocks.price = PRICE;
+
 vi.mock('../lib/usePrice.jsx', () => ({
-  usePrice: () => ({ price: PRICE, loading: false, error: null }),
+  usePrice: () => ({ price: mocks.price, loading: false, error: null }),
 }));
+
+afterEach(() => {
+  mocks.price = PRICE;
+});
 
 const COUNTRIES = [
   {
@@ -230,5 +244,39 @@ describe('information that was in a tooltip only', () => {
     show();
     const row = screen.getByRole('link', { name: 'Singapore' }).closest('tr');
     expect(within(row).getByText(/does not report total reserve assets/)).toBeInTheDocument();
+  });
+});
+
+describe('why the share is missing', () => {
+  test('with no price, it blames the price and says the economy does report its reserves', () => {
+    /*
+     * The bug this exists for: with the feed shut, every row said "This economy
+     * does not report total reserve assets alongside its gold". All 87 of them
+     * do report it, the United States to the tune of 241.7 billion, and the
+     * share was missing only because there was no price to value gold at.
+     */
+    mocks.price = null;
+    show();
+
+    const row = screen.getByRole('link', { name: 'United States' }).closest('tr');
+    expect(within(row).getByText(/needs a price/)).toBeInTheDocument();
+    expect(within(row).getByText(/does report its total reserve assets/)).toBeInTheDocument();
+    expect(within(row).queryByText(/does not report total reserve assets/)).not.toBeInTheDocument();
+  });
+
+  test('with a price, a row that truly lacks the figure still says so', () => {
+    // The other cause must keep working, or this fix has just moved the lie.
+    show();
+
+    const row = screen.getByRole('link', { name: 'Singapore' }).closest('tr');
+    expect(within(row).getByText(/does not report total reserve assets/)).toBeInTheDocument();
+    expect(within(row).queryByText(/needs a price/)).not.toBeInTheDocument();
+  });
+
+  test('with a price, a row that has the figure shows a real percentage', () => {
+    show();
+    const row = screen.getByRole('link', { name: 'United States' }).closest('tr');
+    expect(within(row).queryByText(/needs a price/)).not.toBeInTheDocument();
+    expect(within(row).queryByText(/does not report/)).not.toBeInTheDocument();
   });
 });

@@ -78,11 +78,20 @@ export function CountryDetail() {
         </Card>
 
         <Card title="Share of total reserves">
+          {/* Two unrelated reasons the share can be missing, and this card used
+              to give the second one for both. With no price every economy looked
+              as though it had failed to file its total reserves. See the note in
+              ReservesTable's useMemo. */}
           {share === null ? (
             <>
-              <p className="text-3xl font-semibold text-ink-subtle">n/a</p>
+              <p className="text-3xl font-semibold text-ink-subtle">
+                {price ? 'n/a' : 'needs a price'}
+              </p>
               <p className="mt-2 text-sm text-ink-muted">
-                This economy does not report total reserve assets alongside its gold.
+                {price
+                  ? 'This economy does not report total reserve assets alongside its gold.'
+                  : 'The share is gold at market over gold plus non-gold reserves, so it needs a gold price. ' +
+                    `This economy does report its total reserve assets: ${formatUsdCompact(country.nonGoldReservesUsd)} of non-gold reserves, reported ${formatDate(country.reservesAsOfDate)}.`}
               </p>
             </>
           ) : (

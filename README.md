@@ -16,6 +16,37 @@ a clearly labelled generated-data provider for demonstrations. Without either,
 tonnages and every reserve figure still work and the price panel says why it
 cannot. [What happened, and what the options are](#the-price-feed-closed).
 
+## What it looks like
+
+![The dashboard, with the price panels empty and explaining why](docs/screenshots/dashboard.png)
+
+That is the app as you get it: reserve figures working, price panels empty and
+saying so, and a worked example showing what a price would give you. Nothing is
+guessed and nothing is blank without a reason beside it.
+
+![The reporting economies table](docs/screenshots/countries.png)
+
+Eighty-five economies, sortable by every column except the rank, searchable by
+name, ISO code or region. Accents are folded, so Türkiye is found by typing
+Turkiye.
+
+![A country whose filing was corrected, showing the arithmetic](docs/screenshots/country-detail.png)
+
+Where a reporter filed in the wrong unit, the correction is shown with the
+arithmetic that justified it, not applied silently.
+
+![The dashboard with a provider configured](docs/screenshots/dashboard-generated-prices.png)
+
+And this is what configuring a provider fills in. **Those prices are
+generated**, which is what the two pills and the note say: the shot is taken
+against the demo provider, because the real benchmark is licensed and this
+repository does not redistribute it. The figures are round on purpose so that
+nobody mistakes them for a quote. With a real provider the layout is identical
+and the numbers are real.
+
+Regenerate all four with `npm run screenshots` (and `-- --demo` for the last),
+so they cannot quietly stop matching the app.
+
 ## Quick start
 
 To run it:
@@ -28,6 +59,22 @@ npm start
 Then open http://localhost:5174. One process, one port: the API serves the
 built app alongside its own JSON, so there is no proxy to configure and nothing
 is cross-origin. `npm start` builds first, so it is the only command needed.
+
+The reserve figures work immediately. **The price panels will be empty**,
+because the feed this was built around has closed; the app says so on the page
+rather than guessing, and explains itself. [What happened](#the-price-feed-closed).
+
+**To see it with the price panels filled in**, which is what configuring a
+provider gets you:
+
+```bash
+PRICE_PROVIDER=demo npm start
+```
+
+Every number that provider serves is generated from a fixed seed and labelled
+as such in five places, including a "Not a real price" pill beside the
+headline. It is not a data source and is never the default. It is there so that
+you can see what the app does before deciding whether a key is worth it.
 
 To work on it, with hot reloading:
 
@@ -48,7 +95,7 @@ installing only the backend on 20.6 and serving real data from it. Developed on
 Node 24.
 
 ```bash
-npm test              # both suites: 137 backend, 157 frontend
+npm test              # both suites: 138 backend, 162 frontend
 npm run test:backend
 npm run test:frontend
 npm run test:coverage
@@ -422,8 +469,8 @@ straight out of `index.css` and composited in Node, so
 ground it can land on, including the tinted chips, in all four modes. No
 browser, no CSS engine, and it runs in CI with the rest of the suite.
 
-**The tests cover behaviour, not lines.** 294 of them: 137 backend, 157 frontend.
-The frontend suite covers 86 percent of statements with `coverage.all` enabled,
+**The tests cover behaviour, not lines.** 300 of them: 138 backend, 162 frontend.
+The frontend suite covers 87 percent of statements with `coverage.all` enabled,
 so untested files count as zero rather than being left out of the report. What
 is deliberately not covered is `App.jsx`, `Dashboard.jsx` and `PriceChart.jsx`:
 routing, composition, and a Recharts component whose drawing jsdom cannot

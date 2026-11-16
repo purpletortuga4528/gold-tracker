@@ -25,7 +25,10 @@ describe('in-flight de-duplication', () => {
     const produce = async () => {
       calls += 1;
       await later(20);
-      return { price: 4399 };
+      // An arbitrary payload. It used to be the recorded benchmark truncated
+      // to the dollar, which made check:docs count this file as holding a
+      // price. Nothing here cares what the number is.
+      return { price: 1234 };
     };
 
     const results = await Promise.all(
@@ -33,7 +36,7 @@ describe('in-flight de-duplication', () => {
     );
 
     assert.equal(calls, 1, 'ten concurrent callers must share one upstream call');
-    for (const r of results) assert.deepEqual(r.value, { price: 4399 }, 'every caller gets the value');
+    for (const r of results) assert.deepEqual(r.value, { price: 1234 }, 'every caller gets the value');
   });
 
   test('a failure is not cached, and the next caller may try again', async () => {

@@ -26,10 +26,21 @@
  */
 
 /** The warning that travels with every response this provider produces. */
+/*
+ * Worded to be true of the anchors as well as the series.
+ *
+ * It used to end "must not be read as a quote, a benchmark, or a record of
+ * what gold cost on any date". Every served value is generated, so that was
+ * right about the series, and wrong about the fourteen anchors it is drawn
+ * through: those are real historical levels on real dates, which is the whole
+ * reason the chart has a recognisable shape. A disclaimer that overstates
+ * itself is worth less than one that says exactly what is and is not invented.
+ */
 const DISCLAIMER =
-  'GENERATED DATA, NOT REAL PRICES. Every figure here is invented for ' +
-  'demonstration and must not be read as a quote, a benchmark, or a record of ' +
-  'what gold cost on any date.';
+  'GENERATED DATA, NOT REAL PRICES. Every figure served here is invented for ' +
+  'demonstration and must not be read as a quote or a benchmark. The curve is ' +
+  'drawn through a handful of real historical levels so that a chart of it ' +
+  'reads as a chart, but no value on it is a published price.';
 
 /**
  * Roughly where gold traded, in USD per troy ounce, at a handful of dates
@@ -50,7 +61,18 @@ const ANCHORS = [
   ['2020-08-06', 2067],
   ['2022-11-03', 1618],
   ['2024-10-30', 2787],
-  ['2026-09-08', 4399],
+  /*
+   * A round number, and deliberately not the last published fix.
+   *
+   * This anchor used to be ['2026-09-08', 4399]: the date and value of the
+   * real LBMA PM fix, rounded to the dollar. With the cross-rate multipliers
+   * below also taken from that day, the demo provider reproduced the actual
+   * benchmark to within 0.011 percent in all three currencies, while every
+   * label around it said "Not a real price". A generated series that lands on
+   * the real number is the one thing this provider must not do, whatever the
+   * labels say, and it made the honest labelling look like a formality.
+   */
+  ['2026-09-08', 4000],
 ];
 
 const DAY = 86_400_000;
@@ -144,9 +166,17 @@ export const demoProvider = {
       benchmark: 'Demonstration data',
       synthetic: true,
       alternates: {
-        // Scaled at plausible rates, and invented like everything else here.
-        GBP: Math.round(latest.priceUsdPerOunce * 0.738 * 100) / 100,
-        EUR: Math.round(latest.priceUsdPerOunce * 0.8603 * 100) / 100,
+        /*
+         * Round rates, and that matters more than it looks.
+         *
+         * These were 0.738 and 0.8603, which are the real GBP/USD and EUR/USD
+         * cross-rates of 2026-09-08 to four decimal places. Combined with an
+         * anchor set to that day's fix, the three currencies came out within
+         * 0.011 percent of the published row all at once. The comment here
+         * said "invented like everything else"; they were not.
+         */
+        GBP: Math.round(latest.priceUsdPerOunce * 0.75 * 100) / 100,
+        EUR: Math.round(latest.priceUsdPerOunce * 0.85 * 100) / 100,
       },
       provider: 'demo',
       providerLabel: 'DEMONSTRATION DATA (not real prices)',

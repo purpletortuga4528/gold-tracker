@@ -79,3 +79,37 @@ test('a range slice returns only that range', async () => {
   assert.ok(points.length > 200);
   assert.ok(points.every((p) => p.date >= '2011-01-01' && p.date <= '2011-12-31'));
 });
+
+test('the generated price does not shadow the real benchmark', async () => {
+  /*
+   * The anchor used to be the real LBMA PM fix of 2026-09-08, rounded to the
+   * dollar, with the GBP and EUR multipliers taken from that day's actual
+   * cross-rates. All three currencies then came out within 0.011 percent of
+   * the published row at once, under labels reading "Not a real price".
+   *
+   * Labels do not make a number generated. A demonstration series that lands
+   * on the benchmark is indistinguishable from the benchmark, which is both
+   * misleading and the opposite of what this provider is for.
+   *
+   * Both sides are derived: the reference comes from what the last build
+   * actually priced against, so this keeps working if that changes.
+   */
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const { resolve, dirname } = await import('node:path');
+
+  const here = dirname(fileURLToPath(import.meta.url));
+  const dataset = JSON.parse(readFileSync(resolve(here, '../data/gold-reserves.json'), 'utf8'));
+  const reference = dataset.meta?.unitDetection?.latestReferencePriceUsdPerOunce;
+
+  if (!Number.isFinite(reference)) return; // nothing recorded to compare against
+
+  const spot = await demoProvider.getSpot();
+  const apart = Math.abs(spot.priceUsdPerOunce - reference) / reference;
+
+  assert.ok(
+    apart > 0.02,
+    `the demo price ${spot.priceUsdPerOunce} is within ${(apart * 100).toFixed(3)}% of the ` +
+      `recorded benchmark ${reference}; it must be visibly its own number`,
+  );
+});
